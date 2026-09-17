@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay Invoice — Grace Path Centre</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #1f2937;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            max-width: 520px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .header {
+            background: #0d6e4f;
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .body { padding: 28px 24px; }
+        .field { margin-bottom: 18px; }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color 0.15s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #0d6e4f;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #0d6e4f;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        button:hover:not(:disabled) { background: #0a5a40; }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #f59e0b;
+            margin-top: 10px;
+        }
+        .btn-secondary:hover:not(:disabled) { background: #d97706; }
+        .error {
+            background: #fef2f2;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            border-left: 4px solid #dc2626;
+        }
+        .success {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            border-left: 4px solid #16a34a;
+        }
+        .info {
+            background: #eff6ff;
+            color: #1e40af;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            border-left: 4px solid #2563eb;
+        }
+        .invoice-detail {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
+            border: 1px solid #e5e7eb;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+        }
+        .detail-row .label { color: #6b7280; }
+        .detail-row .value { font-weight: 600; color: #111827; }
+        .items {
+            margin-top: 12px;
+            border-top: 1px dashed #d1d5db;
+            padding-top: 12px;
+        }
+        .item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            padding: 4px 0;
+            color: #4b5563;
+        }
+        .balance-highlight {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 2px solid #0d6e4f;
+            font-size: 17px;
+            font-weight: 700;
+            color: #0d6e4f;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-unpaid { background: #fee2e2; color: #991b1b; }
+        .status-partially_paid { background: #fef3c7; color: #92400e; }
+        .status-paid { background: #d1fae5; color: #065f46; }
+        .status-overpaid { background: #dbeafe; color: #1e40af; }
+        .footer {
+            padding: 16px 24px;
+            background: #f9fafb;
+            font-size: 11px;
+            color: #6b7280;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <h1>Grace Path Centre</h1>
+            <p>Pay Invoice with M-Pesa</p>
+        </div>
+
+        <div class="body">
+            <!-- Step 1: Invoice lookup -->
+            <div id="step-lookup">
+                <div class="field">
+                    <label for="invoice_number">Invoice Number</label>
+                    <input
+                        type="text"
+                        id="invoice_number"
+                        placeholder="e.g. INV-2026-000001"
+                        autocomplete="off"
+                        autocapitalize="characters"
+                    />
+                </div>
+                <button id="btn-lookup">Look Up Invoice</button>
+            </div>
+
+            <!-- Step 2: Payment form -->
+            <div id="step-payment" class="hidden">
+                <div id="invoice_details"></div>
+
+                <div id="payment_message"></div>
+
+                <div class="field">
+                    <label for="phone">Your M-Pesa Phone Number</label>
+                    <input
+                        type="tel"
+                        id="phone"
+                        placeholder="e.g. 0712345678"
+                        autocomplete="tel"
+                    />
+                    <div style="font-size:12px; color:#6b7280; margin-top:4px;">
+                        You will receive a PIN prompt on this number.
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="amount">Amount to Pay (KSh)</label>
+                    <input
+                        type="number"
+                        id="amount"
+                        min="1"
+                        step="1"
+                    />
+                    <div style="font-size:12px; color:#6b7280; margin-top:4px;">
+                        Default is the outstanding balance. You may pay less for partial payment.
+                    </div>
+                </div>
+
+                <button id="btn-pay">
+                    <span id="btn-pay-text">Pay with M-Pesa</span>
+                </button>
+
+                <button id="btn-simulate" class="btn-secondary">
+                    Simulate Payment (Test Only)
+                </button>
+
+                <button
+                    id="btn-new-lookup"
+                    style="background:#6b7280; margin-top:10px;"
+                >
+                    Look Up Another Invoice
+                </button>
+            </div>
+        </div>
+
+        <div class="footer">
+            Grace Path Centre for Palliative Medicine and Advanced Wound Care Services
+        </div>
+    </div>
+
+    <script>
+        // Same origin as the page — works in Codespaces, local, and production
+        const BACKEND_URL = window.location.origin;
+
+        const $ = (id) => document.getElementById(id);
+        let currentInvoice = null;
+
+        // Utility: format KSh amounts
+        function formatKsh(value) {
+            const num = Number(value);
+            return 'KSh ' + num.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Utility: set message
+        function showMessage(containerId, text, type = 'info') {
+            const el = $(containerId);
+            el.innerHTML = text ? `<div class="${type}">${text}</div>` : '';
+        }
+
+        // Utility: show/hide
+        function show(id) { $(id).classList.remove('hidden'); }
+        function hide(id) { $(id).classList.add('hidden'); }
+
+        // Utility: set button loading state
+        function setLoading(btnId, loading, loadingText) {
+            const btn = $(btnId);
+            if (loading) {
+                btn.disabled = true;
+                btn.dataset.originalHtml = btn.innerHTML;
+                btn.innerHTML = `<span class="spinner"></span>${loadingText}`;
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = btn.dataset.originalHtml || btn.innerHTML;
+            }
+        }
+
+        // ---------- STEP 1: Look up invoice ----------
+        async function lookupInvoice() {
+            const invNum = $('invoice_number').value.trim().toUpperCase();
+            if (!invNum) {
+                alert('Please enter an invoice number');
+                return;
+            }
+
+            setLoading('btn-lookup', true, 'Looking up...');
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/invoices/public/${encodeURIComponent(invNum)}`);
+
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    showMessage('payment_message', '', '');
+                    // Show inline error on lookup page
+                    let errEl = $('lookup_error');
+                    if (!errEl) {
+                        errEl = document.createElement('div');
+                        errEl.id = 'lookup_error';
+                        $('step-lookup').insertBefore(errEl, $('step-lookup').firstChild);
+                    }
+                    errEl.innerHTML = `<div class="error">${data.detail || 'Invoice not found. Please check the number.'}</div>`;
+                    return;
+                }
+
+                // Clear old error
+                const oldErr = $('lookup_error');
+                if (oldErr) oldErr.remove();
+
+                currentInvoice = await res.json();
+                renderInvoice();
+                hide('step-lookup');
+                show('step-payment');
+            } catch (err) {
+                alert('Network error: ' + err.message);
+            } finally {
+                setLoading('btn-lookup', false);
+            }
+        }
+
+        // ---------- Render invoice details ----------
+        function renderInvoice() {
+            const inv = currentInvoice;
+            const statusClass = 'status-' + (inv.status || 'unpaid');
+            const statusLabel = (inv.status || 'unpaid').replace('_', ' ');
+
+            let itemsHtml = '';
+            if (inv.items && inv.items.length > 0) {
+                itemsHtml = '<div class="items">';
+                for (const item of inv.items) {
+                    itemsHtml += `
+                        <div class="item">
+                            <span>${item.description}</span>
+                            <span>${formatKsh(item.amount)}</span>
+                        </div>
+                    `;
+                }
+                itemsHtml += '</div>';
+            }
+
+            const alreadyPaid = Number(inv.amount_paid) > 0;
+
+            $('invoice_details').innerHTML = `
+                <div class="invoice-detail">
+                    <div class="detail-row">
+                        <span class="label">Invoice</span>
+                        <span class="value">${inv.invoice_number}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Patient</span>
+                        <span class="value">${inv.patient_name}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Patient No.</span>
+                        <span class="value">${inv.patient_number}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Status</span>
+                        <span class="value">
+                            <span class="status-badge ${statusClass}">${statusLabel}</span>
+                        </span>
+                    </div>
+                    ${alreadyPaid ? `
+                    <div class="detail-row">
+                        <span class="label">Already Paid</span>
+                        <span class="value">${formatKsh(inv.amount_paid)}</span>
+                    </div>` : ''}
+                    ${itemsHtml}
+                    <div class="detail-row balance-highlight">
+                        <span>Balance Due</span>
+                        <span>${formatKsh(inv.balance)}</span>
+                    </div>
+                </div>
+            `;
+
+            // Pre-fill amount with outstanding balance
+            const balance = Number(inv.balance);
+
+if (balance <= 0) {
+    // Invoice is fully settled — disable payment
+    $('amount').value = '0.00';
+    $('amount').disabled = true;
+    $('phone').disabled = true;
+    $('btn-pay').disabled = true;
+    $('btn-simulate').disabled = true;
+    showMessage(
+        'payment_message',
+        '<strong>✅ This invoice is fully settled.</strong><br>No further payment is required. Thank you!',
+        'success'
+    );
+} else {
+    $('amount').disabled = false;
+    $('phone').disabled = false;
+    $('btn-pay').disabled = false;
+    $('btn-simulate').disabled = false;
+    $('amount').value = balance.toFixed(2);
+    $('amount').max = balance.toFixed(2);
+}
+        }
+
+        // ---------- STEP 2: Initiate M-Pesa payment ----------
+        async function initiatePayment() {
+            const phone = $('phone').value.trim();
+            const amount = Number($('amount').value);
+
+            if (!phone) {
+                showMessage('payment_message', 'Please enter your M-Pesa phone number.', 'error');
+                return;
+            }
+            if (!amount || amount <= 0) {
+                showMessage('payment_message', 'Please enter a valid amount.', 'error');
+                return;
+            }
+            if (amount > Number(currentInvoice.balance)) {
+                showMessage('payment_message', 'Amount exceeds outstanding balance.', 'error');
+                return;
+            }
+
+            setLoading('btn-pay', true, 'Sending request...');
+            showMessage('payment_message', '', '');
+
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/payments/mpesa/stkpush`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        invoice_number: currentInvoice.invoice_number,
+                        phone: phone,
+                        amount: amount,
+                    }),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showMessage('payment_message', data.detail || 'Payment request failed.', 'error');
+                    return;
+                }
+
+                if (data.simulation) {
+                    showMessage(
+                        'payment_message',
+                        `<strong>Simulation mode</strong><br>${data.customer_message}<br><br>
+                         Since Safaricom credentials aren't set up yet, no real PIN prompt was sent.
+                         Use the "Simulate Payment (Test Only)" button below to complete this flow in the test environment.`,
+                        'info'
+                    );
+                } else {
+                    showMessage(
+                        'payment_message',
+                        `<strong>Check your phone!</strong><br>${data.customer_message || 'Enter your M-Pesa PIN to complete the payment.'}`,
+                        'success'
+                    );
+                }
+            } catch (err) {
+                showMessage('payment_message', 'Network error: ' + err.message, 'error');
+            } finally {
+                setLoading('btn-pay', false);
+            }
+        }
+
+        // ---------- STEP 3: Simulate payment (test only) ----------
+        async function simulatePayment() {
+            if (!confirm('This will simulate a successful M-Pesa payment. Continue?')) return;
+
+            const amount = Number($('amount').value);
+            const receipt = 'SIM' + Date.now().toString(36).toUpperCase();
+            const phone = $('phone').value.trim() || '254700000000';
+
+            setLoading('btn-simulate', true, 'Simulating...');
+
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/payments/mpesa/simulate-callback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        invoice_number: currentInvoice.invoice_number,
+                        amount: amount,
+                        mpesa_receipt: receipt,
+                        payer_name: 'Test Payer',
+                        payer_phone: phone,
+                    }),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showMessage('payment_message', data.detail || 'Simulation failed.', 'error');
+                    return;
+                }
+
+                // Refresh invoice
+                const invRes = await fetch(`${BACKEND_URL}/api/invoices/public/${encodeURIComponent(currentInvoice.invoice_number)}`);
+                currentInvoice = await invRes.json();
+                renderInvoice();
+
+                showMessage(
+                    'payment_message',
+                    `<strong>✅ Payment recorded!</strong><br>
+                     Receipt: <code>${receipt}</code><br>
+                     Amount: ${formatKsh(amount)}<br>
+                     New balance: ${formatKsh(currentInvoice.balance)}`,
+                    'success'
+                );
+            } catch (err) {
+                showMessage('payment_message', 'Network error: ' + err.message, 'error');
+            } finally {
+                setLoading('btn-simulate', false);
+            }
+        }
+
+        // ---------- Reset ----------
+        function resetLookup() {
+            currentInvoice = null;
+            $('invoice_number').value = '';
+            $('phone').value = '';
+            $('amount').value = '';
+            showMessage('payment_message', '', '');
+            hide('step-payment');
+            show('step-lookup');
+        }
+
+        // ---------- Wire up events ----------
+        $('btn-lookup').addEventListener('click', lookupInvoice);
+        $('btn-pay').addEventListener('click', initiatePayment);
+        $('btn-simulate').addEventListener('click', simulatePayment);
+        $('btn-new-lookup').addEventListener('click', resetLookup);
+
+        $('invoice_number').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') lookupInvoice();
+        });
+
+        // Auto-uppercase invoice number
+        $('invoice_number').addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+        });
+
+                // Focus first input on load, and pre-fill invoice from ?invoice=...
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            const inv = params.get('invoice');
+            if (inv) {
+                $('invoice_number').value = inv.toUpperCase();
+                // Auto-lookup
+                lookupInvoice();
+            } else {
+                $('invoice_number').focus();
+            }
+        });
+    </script>
+</body>
+</html>

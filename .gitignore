@@ -6,13 +6,15 @@ __pycache__/
 venv/
 env/
 
-# Env
+# Env & secrets
 .env
 .env.local
+.env.*.local
 
 # Database
 *.db
 *.sqlite3
+*.db-journal
 
 # IDE
 .vscode/
@@ -21,3 +23,6 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log

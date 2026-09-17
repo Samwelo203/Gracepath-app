@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
+from pathlib import Path
 
 from app.core.config import settings
 from app.db.session import Base, engine
@@ -22,12 +25,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],   # same origin now, so this is only for external tools
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ---------- API routes ----------
 app.include_router(auth.router)
 app.include_router(patient.router)
 app.include_router(bed.router)
@@ -36,9 +40,28 @@ app.include_router(invoice.router)
 app.include_router(payment.router)
 
 
+# ---------- Static frontend ----------
+# Path:  backend/app/main.py -> ../../.. -> project root -> frontend/public
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PUBLIC_DIR = PROJECT_ROOT / "frontend" / "public"
+
+@app.get("/pay")
+def pay_redirect():
+    return RedirectResponse("/pay/payment.html")
+
+if PUBLIC_DIR.exists():
+    app.mount(
+        "/pay",
+        StaticFiles(directory=str(PUBLIC_DIR), html=True),
+        name="pay",
+    )
+    print(f"[static] Serving /pay from {PUBLIC_DIR}")
+else:
+    print(f"[static] WARNING: {PUBLIC_DIR} not found — /pay will be 404")
+
+
 @app.on_event("startup")
 def _seed():
-    """Create default admin on first startup."""
     from app.db.session import SessionLocal
     from app.services import auth_service
     db = SessionLocal()
@@ -54,6 +77,8 @@ def root():
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "status": "running",
+        "payment_page": "/pay/payment.html",
+        "api_docs": "/docs",
     }
 
 
