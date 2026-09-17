@@ -6,10 +6,10 @@ from app.db.session import Base, engine
 
 from app.models import (  # noqa: F401
     Patient, CodeSequence, Bed, Admission, BedAssignment,
-    Invoice, InvoiceItem, MpesaTransaction,
+    Invoice, InvoiceItem, MpesaTransaction, User,
 )
 
-from app.routers import patient, bed, admission, invoice, payment
+from app.routers import patient, bed, admission, invoice, payment, auth
 
 
 Base.metadata.create_all(bind=engine)
@@ -28,11 +28,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(patient.router)
 app.include_router(bed.router)
 app.include_router(admission.router)
 app.include_router(invoice.router)
 app.include_router(payment.router)
+
+
+@app.on_event("startup")
+def _seed():
+    """Create default admin on first startup."""
+    from app.db.session import SessionLocal
+    from app.services import auth_service
+    db = SessionLocal()
+    try:
+        auth_service.ensure_default_admin(db)
+    finally:
+        db.close()
 
 
 @app.get("/", tags=["Health"])

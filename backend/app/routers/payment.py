@@ -8,6 +8,8 @@ from app.schemas.mpesa import (
     STKPushRequest, STKPushResponse, MpesaTransactionRead, SimulationCallback,
 )
 from app.services import payment_service, mpesa_client, billing_service
+from app.core.security import require_accounts
+from app.models.user import User
 
 router = APIRouter(prefix="/api/payments/mpesa", tags=["M-Pesa Payments"])
 
@@ -128,18 +130,21 @@ def list_transactions(
     skip: int = 0,
     limit: int = Query(200, le=1000),
     db: Session = Depends(get_db),
+    user: User = Depends(require_accounts),
 ):
     return payment_service.list_transactions(db, status_filter, invoice_id, skip, limit)
 
 
 @router.get("/transactions/{tx_id}", response_model=MpesaTransactionRead)
-def get_transaction(tx_id: int, db: Session = Depends(get_db)):
+def get_transaction(tx_id: int, db: Session = Depends(get_db),
+                     user: User = Depends(require_accounts)):
     return payment_service.get_transaction(db, tx_id)
 
 
 # ---------- Unmatched queue ----------
 @router.get("/unmatched", response_model=List[MpesaTransactionRead])
-def unmatched(db: Session = Depends(get_db)):
+def unmatched(db: Session = Depends(get_db),
+               user: User = Depends(require_accounts)):
     return payment_service.list_unmatched(db)
 
 
@@ -148,5 +153,6 @@ def link_unmatched(
     tx_id: int,
     invoice_number: str = Query(...),
     db: Session = Depends(get_db),
+    user: User = Depends(require_accounts),
 ):
     return payment_service.link_unmatched_to_invoice(db, tx_id, invoice_number)

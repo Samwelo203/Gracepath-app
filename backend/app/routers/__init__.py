@@ -1,3 +1,3 @@
-from app.routers import patient, bed, admission, invoice, payment
+from app.routers import patient, bed, admission, invoice, payment, auth
 
-__all__ = ["patient", "bed", "admission", "invoice", "payment"]
+__all__ = ["patient", "bed", "admission", "invoice", "payment", "auth"]

@@ -11,6 +11,10 @@ from app.schemas.invoice import (
 from app.schemas.mpesa import (
     STKPushRequest, STKPushResponse, MpesaTransactionRead, SimulationCallback,
 )
+from app.schemas.auth import (
+    UserCreate, UserRead, UserUpdate, PasswordChange,
+    LoginRequest, TokenResponse,
+)
 
 __all__ = [
     "PatientCreate", "PatientUpdate", "PatientRead",
@@ -20,4 +24,6 @@ __all__ = [
     "InvoiceItemCreate", "InvoiceItemRead", "InvoiceRead", "InvoiceDetail",
     "InvoiceFromAdmission", "ManualCharge", "PublicInvoiceView",
     "STKPushRequest", "STKPushResponse", "MpesaTransactionRead", "SimulationCallback",
+    "UserCreate", "UserRead", "UserUpdate", "PasswordChange",
+    "LoginRequest", "TokenResponse",
 ]

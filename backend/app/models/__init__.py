@@ -4,10 +4,11 @@ from app.models.bed import Bed
 from app.models.admission import Admission, BedAssignment
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.mpesa import MpesaTransaction
+from app.models.user import User
 
 __all__ = [
     "CodeSequence", "Patient", "Bed",
     "Admission", "BedAssignment",
     "Invoice", "InvoiceItem",
-    "MpesaTransaction",
+    "MpesaTransaction", "User",
 ]
