@@ -1,4 +1,36 @@
 // Small shared UI primitives used across pages.
+import {
+  AlertTriangle, BedDouble, Check, CircleUserRound, CreditCard,
+  FileText, KeyRound, LayoutDashboard, Link, LogOut, MapPin,
+  Receipt, Search, ShieldAlert, Stethoscope, UsersRound, Wallet, X,
+} from 'lucide-react';
+
+const ICONS = {
+  alert: AlertTriangle,
+  bed: BedDouble,
+  check: Check,
+  dashboard: LayoutDashboard,
+  empty: FileText,
+  invoice: Receipt,
+  link: Link,
+  key: KeyRound,
+  logout: LogOut,
+  mapPin: MapPin,
+  patients: UsersRound,
+  payment: CreditCard,
+  receipt: Receipt,
+  search: Search,
+  security: ShieldAlert,
+  stethoscope: Stethoscope,
+  user: CircleUserRound,
+  wallet: Wallet,
+  close: X,
+};
+
+export function Icon({ name, size = 18, strokeWidth = 2, className = '' }) {
+  const Component = ICONS[name] || FileText;
+  return <Component aria-hidden="true" size={size} strokeWidth={strokeWidth} className={className} />;
+}
 
 export function PageHeader({ title, subtitle, action }) {
   return (
@@ -98,10 +130,10 @@ export function Spinner() {
   );
 }
 
-export function EmptyState({ icon = '📭', title, message, action }) {
+export function EmptyState({ icon = 'empty', title, message, action }) {
   return (
     <div className="text-center p-12">
-      <div className="text-5xl mb-3">{icon}</div>
+      <div className="flex justify-center text-brand-500 mb-3"><Icon name={icon} size={42} strokeWidth={1.6} /></div>
       <h3 className="font-medium text-gray-900 mb-1">{title}</h3>
       {message && <p className="text-sm text-gray-500 mb-4">{message}</p>}
       {action}

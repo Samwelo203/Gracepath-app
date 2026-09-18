@@ -79,19 +79,11 @@ export default function Login() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
 
-          <div className="pt-4 border-t border-gray-100 space-y-2">
-  <a
-    href="/pay/payment.html"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="block text-center text-sm text-brand-600 hover:text-brand-700 font-medium"
-  >
-    💳 Pay an Invoice (Payer Portal) →
-  </a>
+          <div className="pt-4 border-t border-gray-100">
   <p className="text-xs text-gray-500 text-center">
     Default admin: <code className="bg-gray-100 px-1 rounded">admin / GracePath2026!</code>
   </p>
-</div>
+          </div>
         </form>
       </div>
     </div>

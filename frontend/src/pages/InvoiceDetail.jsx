@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
   PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
-  Modal, formatKsh, formatDateTime,
+  Modal, Icon, formatKsh, formatDateTime,
 } from '../components/ui';
 
 const STATUS_COLORS = {
@@ -59,7 +59,7 @@ export default function InvoiceDetail() {
     return (
       <div className="p-8">
         <EmptyState
-          icon="⚠️"
+          icon="alert"
           title="Invoice not found"
           message={error.response?.data?.detail || error.message}
           action={<Button onClick={() => navigate('/invoices')}>← Back to Invoices</Button>}
@@ -96,7 +96,7 @@ export default function InvoiceDetail() {
           <div className="flex gap-2">
             <CopyLinkButton invoiceNumber={invoice.invoice_number} />
             <Button variant="secondary" onClick={() => setShowRefresh(true)}>
-              🔄 Refresh Charges
+              <><Icon name="receipt" size={16} /> Refresh Charges</>
             </Button>
             <Button onClick={() => setShowAddCharge(true)}>+ Add Charge</Button>
           </div>
@@ -187,7 +187,7 @@ export default function InvoiceDetail() {
                       className="text-red-500 hover:text-red-700 text-xs"
                       title="Remove item"
                     >
-                      ✕
+                      <Icon name="close" size={15} />
                     </button>
                   </td>
                 </tr>
@@ -437,7 +437,7 @@ function CopyLinkButton({ invoiceNumber }) {
 
   return (
     <Button variant="secondary" onClick={handleCopy} title={url}>
-      {copied ? '✅ Copied' : '🔗 Payer Link'}
+      {copied ? <><Icon name="check" size={16} /> Copied</> : <><Icon name="link" size={16} /> Payer Link</>}
     </Button>
   );
 }

@@ -40,3 +40,18 @@ class PatientRead(PatientBase):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PatientNoteCreate(BaseModel):
+    note: str = Field(..., min_length=1, max_length=5000)
+
+
+class PatientNoteRead(BaseModel):
+    id: int
+    patient_id: int
+    author_id: int
+    author_name: str
+    note: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

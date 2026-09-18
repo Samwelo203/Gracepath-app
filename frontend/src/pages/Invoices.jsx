@@ -67,7 +67,7 @@ export default function Invoices() {
         <div className="p-4">
           <input
             type="text"
-            placeholder="🔍 Search by invoice number or patient name…"
+            placeholder="Search by invoice number or patient name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full border-2 border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
@@ -88,10 +88,10 @@ export default function Invoices() {
         {isLoading ? (
           <Spinner />
         ) : error ? (
-          <EmptyState icon="⚠️" title="Could not load invoices" message={error.response?.data?.detail || error.message} />
+          <EmptyState icon="alert" title="Could not load invoices" message={error.response?.data?.detail || error.message} />
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon="💰"
+            icon="invoice"
             title={search ? 'No matches' : 'No invoices yet'}
             message={search ? `No invoices match "${search}"` : 'Invoices are auto-created when patients are admitted.'}
           />

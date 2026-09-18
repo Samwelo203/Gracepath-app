@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import {
   PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
   Modal, formatDateTime,
@@ -15,6 +16,8 @@ const STATUS_COLORS = {
 
 export default function Admissions() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canManageAdmissions = ['admin', 'receptionist'].includes(user?.role);
   const [filter, setFilter] = useState('active');  // active | discharged | '' (all)
   const [showAdmit, setShowAdmit] = useState(false);
 
@@ -36,9 +39,9 @@ export default function Admissions() {
       <PageHeader
         title="Admissions"
         subtitle="Manage patient stays and bed assignments"
-        action={
+        action={canManageAdmissions && (
           <Button onClick={() => setShowAdmit(true)}>+ Admit Patient</Button>
-        }
+        )}
       />
 
       {/* Filter */}
@@ -53,17 +56,17 @@ export default function Admissions() {
           <Spinner />
         ) : error ? (
           <EmptyState
-            icon="⚠️"
+            icon="alert"
             title="Could not load admissions"
             message={error.response?.data?.detail || error.message}
           />
         ) : !admissions || admissions.length === 0 ? (
           <EmptyState
-            icon="🏥"
+            icon="stethoscope"
             title={filter === 'active' ? 'No active admissions' : 'No admissions found'}
             message="Admit a patient to get started."
             action={
-              filter === 'active' && (
+              filter === 'active' && canManageAdmissions && (
                 <Button onClick={() => setShowAdmit(true)}>+ Admit Patient</Button>
               )
             }
@@ -79,12 +82,12 @@ export default function Admissions() {
                   <th className="text-left px-5 py-3 font-medium">Admitted</th>
                   <th className="text-left px-5 py-3 font-medium">Discharged</th>
                   <th className="text-left px-5 py-3 font-medium">Status</th>
-                  <th className="text-right px-5 py-3 font-medium">Actions</th>
+                  {canManageAdmissions && <th className="text-right px-5 py-3 font-medium">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {admissions.map((adm) => (
-                  <AdmissionRow key={adm.id} admission={adm} onAction={refresh} />
+                  <AdmissionRow key={adm.id} admission={adm} onAction={refresh} canManage={canManageAdmissions} />
                 ))}
               </tbody>
             </table>
@@ -93,7 +96,7 @@ export default function Admissions() {
       </Card>
 
       <AdmitPatientModal
-        open={showAdmit}
+        open={showAdmit && canManageAdmissions}
         onClose={() => setShowAdmit(false)}
         onSuccess={() => {
           setShowAdmit(false);
@@ -123,7 +126,7 @@ function FilterChip({ label, active, onClick }) {
 
 
 // ---------- Admission row ----------
-function AdmissionRow({ admission, onAction }) {
+function AdmissionRow({ admission, onAction, canManage }) {
   const [showAssign, setShowAssign] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showDischarge, setShowDischarge] = useState(false);
@@ -180,7 +183,7 @@ function AdmissionRow({ admission, onAction }) {
             {admission.status}
           </Badge>
         </td>
-        <td className="px-5 py-3 text-right">
+        {canManage && <td className="px-5 py-3 text-right">
           {isActive && (
             <div className="flex gap-1 justify-end">
               {!currentBed && (
@@ -198,12 +201,12 @@ function AdmissionRow({ admission, onAction }) {
               </Button>
             </div>
           )}
-        </td>
+        </td>}
       </tr>
 
       {expanded && (
         <tr className="bg-gray-50">
-          <td colSpan={7} className="px-5 py-4">
+          <td colSpan={canManage ? 7 : 6} className="px-5 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <div className="text-xs uppercase text-gray-500 mb-1">Reason</div>

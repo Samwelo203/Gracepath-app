@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
   PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
-  Modal, formatKsh, formatDateTime,
+  Modal, Icon, formatKsh, formatDateTime,
 } from '../components/ui';
 
 const STATUS_COLORS = {
@@ -69,7 +69,7 @@ export default function Payments() {
       {tab === 'unmatched' && (
         <Card className="mb-4 bg-yellow-50 border-yellow-200">
           <div className="p-4 text-sm text-yellow-800">
-            <strong>⚠️ Unmatched payments need attention</strong>
+            <strong className="flex items-center gap-2"><Icon name="alert" size={17} />Unmatched payments need attention</strong>
             <p className="text-xs mt-1">
               These M-Pesa payments didn't have a valid invoice number.
               Review each one and link it to the correct invoice, or contact the payer.
@@ -82,14 +82,14 @@ export default function Payments() {
         {isLoading ? (
           <Spinner />
         ) : error ? (
-          <EmptyState icon="⚠️" title="Could not load payments" message={error.response?.data?.detail || error.message} />
+          <EmptyState icon="alert" title="Could not load payments" message={error.response?.data?.detail || error.message} />
         ) : !transactions || transactions.length === 0 ? (
           <EmptyState
-            icon="📱"
+            icon="payment"
             title={tab === 'unmatched' ? 'No unmatched payments' : 'No payments yet'}
             message={
               tab === 'unmatched'
-                ? 'All M-Pesa payments have been matched to invoices. 🎉'
+                ? 'All M-Pesa payments have been matched to invoices.'
                 : 'M-Pesa transactions will appear here as they come in.'
             }
           />

@@ -4,7 +4,7 @@ import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
   PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
-  Modal, formatDateTime,
+  Modal, Icon, formatDateTime,
 } from '../components/ui';
 
 const ROLE_COLORS = {
@@ -51,10 +51,10 @@ export default function Users() {
         <div className="p-4 text-sm text-blue-800">
           <strong>Roles explained</strong>
           <ul className="mt-2 space-y-1 text-xs">
-            <li>🔴 <strong>Admin</strong> — full access to everything, including user management</li>
-            <li>🔵 <strong>Receptionist</strong> — patients, beds, admissions (no billing changes)</li>
-            <li>🟣 <strong>Accounts</strong> — invoices, payments, reconciliation</li>
-            <li>🟢 <strong>Clinician</strong> — read-only access to patient and admission data</li>
+            <li className="flex items-center gap-2"><Icon name="security" size={14} /><strong>Admin</strong> — full access to everything, including user management</li>
+            <li className="flex items-center gap-2"><Icon name="patients" size={14} /><strong>Receptionist</strong> — patients, beds, admissions (no billing changes)</li>
+            <li className="flex items-center gap-2"><Icon name="wallet" size={14} /><strong>Accounts</strong> — invoices, payments, reconciliation</li>
+            <li className="flex items-center gap-2"><Icon name="stethoscope" size={14} /><strong>Clinician</strong> — read-only access to patient and admission data</li>
           </ul>
         </div>
       </Card>
@@ -63,9 +63,9 @@ export default function Users() {
         {isLoading ? (
           <Spinner />
         ) : error ? (
-          <EmptyState icon="⚠️" title="Could not load users" message={error.response?.data?.detail || error.message} />
+          <EmptyState icon="alert" title="Could not load users" message={error.response?.data?.detail || error.message} />
         ) : !users || users.length === 0 ? (
-          <EmptyState icon="🔐" title="No users" />
+          <EmptyState icon="security" title="No users" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -274,6 +274,7 @@ function EditUserModal({ open, onClose, user, currentUser, onSuccess }) {
     email: user.email || '',
     role: user.role,
     is_active: user.is_active,
+    new_password: '',
   });
   const [error, setError] = useState('');
 
@@ -285,12 +286,24 @@ function EditUserModal({ open, onClose, user, currentUser, onSuccess }) {
     onError: (err) => setError(err.response?.data?.detail || 'Failed to update user.'),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/api/auth/users/${user.id}`),
+    onSuccess,
+    onError: (err) => setError(err.response?.data?.detail || 'Failed to delete user.'),
+  });
+
   function handleSubmit(e) {
     e.preventDefault();
     setError('');
     const payload = { ...form };
     if (!payload.email) delete payload.email;
+    if (!payload.new_password) delete payload.new_password;
     mutation.mutate(payload);
+  }
+
+  function handleDelete() {
+    if (!confirm(`Delete inactive user ${user.username}? This cannot be undone.`)) return;
+    deleteMutation.mutate();
   }
 
   return (
@@ -332,6 +345,15 @@ function EditUserModal({ open, onClose, user, currentUser, onSuccess }) {
           )}
         </div>
 
+        <Input
+          label="Reset Password"
+          type="text"
+          minLength={6}
+          value={form.new_password}
+          onChange={(e) => setForm({ ...form, new_password: e.target.value })}
+          placeholder="Leave blank to keep current password"
+        />
+
         <div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -348,11 +370,21 @@ function EditUserModal({ open, onClose, user, currentUser, onSuccess }) {
           )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-2">
+        <div className="flex justify-between gap-3 pt-2">
+          <Button
+            type="button"
+            variant="danger"
+            onClick={handleDelete}
+            disabled={user.is_active || deleteMutation.isPending || isSelf}
+          >
+            {deleteMutation.isPending ? 'Deleting…' : 'Delete User'}
+          </Button>
+          <div className="flex gap-3">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? 'Saving…' : 'Save Changes'}
           </Button>
+          </div>
         </div>
       </form>
     </Modal>

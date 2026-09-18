@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from pathlib import Path
 
 from app.core.config import settings
@@ -10,6 +10,7 @@ from app.db.session import Base, engine
 from app.models import (  # noqa: F401
     Patient, CodeSequence, Bed, Admission, BedAssignment,
     Invoice, InvoiceItem, MpesaTransaction, User,
+    PatientNote,
 )
 
 from app.routers import patient, bed, admission, invoice, payment, auth
@@ -25,13 +26,25 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # same origin now, so this is only for external tools
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------- API routes ----------
+
+# =========================================================
+# Project paths
+# =========================================================
+# backend/app/main.py → ../../.. = project root
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PUBLIC_DIR = PROJECT_ROOT / "frontend" / "public"     # payer portal
+DIST_DIR = PROJECT_ROOT / "frontend" / "dist"         # built React app
+
+
+# =========================================================
+# API routes
+# =========================================================
 app.include_router(auth.router)
 app.include_router(patient.router)
 app.include_router(bed.router)
@@ -40,26 +53,80 @@ app.include_router(invoice.router)
 app.include_router(payment.router)
 
 
-# ---------- Static frontend ----------
-# Path:  backend/app/main.py -> ../../.. -> project root -> frontend/public
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-PUBLIC_DIR = PROJECT_ROOT / "frontend" / "public"
+# =========================================================
+# Health + root
+# =========================================================
+@app.get("/", tags=["Health"])
+def root():
+    return {
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "running",
+        "staff_dashboard": "/app/",
+        "payer_portal": "/pay/payment.html",
+        "api_docs": "/docs",
+    }
 
-@app.get("/pay")
+
+@app.get("/health", tags=["Health"])
+def health():
+    return {"status": "ok"}
+
+
+# =========================================================
+# Payload portal redirects
+# =========================================================
+@app.get("/pay", include_in_schema=False)
 def pay_redirect():
     return RedirectResponse("/pay/payment.html")
 
+
+# =========================================================
+# Static mounts
+# =========================================================
+# Payer portal (frontend/public/)
 if PUBLIC_DIR.exists():
     app.mount(
         "/pay",
         StaticFiles(directory=str(PUBLIC_DIR), html=True),
         name="pay",
     )
-    print(f"[static] Serving /pay from {PUBLIC_DIR}")
+    print(f"[static] /pay  ->  {PUBLIC_DIR}")
 else:
-    print(f"[static] WARNING: {PUBLIC_DIR} not found — /pay will be 404")
+    print(f"[static] WARNING: {PUBLIC_DIR} not found")
 
 
+# React staff dashboard (frontend/dist/)
+if DIST_DIR.exists():
+    app.mount(
+        "/app",
+        StaticFiles(directory=str(DIST_DIR), html=True),
+        name="app",
+    )
+    print(f"[static] /app  ->  {DIST_DIR}")
+else:
+    print(f"[static] WARNING: {DIST_DIR} not found — run `npm run build` in frontend/")
+
+
+# Redirect /app (no trailing slash) → /app/
+@app.get("/app", include_in_schema=False)
+def app_redirect():
+    return RedirectResponse("/app/")
+
+
+# SPA fallback: any /app/* route that isn't a real file returns index.html
+# so React Router handles it (needed for direct URL access to /app/invoices/5 etc.)
+@app.get("/app/{full_path:path}", include_in_schema=False)
+def spa_fallback(full_path: str):
+    index_file = DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return RedirectResponse("/")
+
+
+# =========================================================
+# Startup — seed default admin
+# =========================================================
 @app.on_event("startup")
 def _seed():
     from app.db.session import SessionLocal
@@ -69,19 +136,3 @@ def _seed():
         auth_service.ensure_default_admin(db)
     finally:
         db.close()
-
-
-@app.get("/", tags=["Health"])
-def root():
-    return {
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "status": "running",
-        "payment_page": "/pay/payment.html",
-        "api_docs": "/docs",
-    }
-
-
-@app.get("/health", tags=["Health"])
-def health():
-    return {"status": "ok"}

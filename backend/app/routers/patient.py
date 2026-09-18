@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.db.session import get_db
-from app.schemas.patient import PatientCreate, PatientUpdate, PatientRead
+from app.schemas.patient import PatientCreate, PatientUpdate, PatientRead, PatientNoteCreate, PatientNoteRead
 from app.services import patient_service
-from app.core.security import require_staff, require_clinical
+from app.core.security import require_staff, require_clinical, require_clinician
 from app.models.user import User
 
 router = APIRouter(prefix="/api/patients", tags=["Patients"])
@@ -57,3 +57,35 @@ def delete_patient(patient_id: int, db: Session = Depends(get_db),
                     user: User = Depends(require_staff)):
     patient_service.delete_patient(db, patient_id)
     return None
+
+
+@router.get("/{patient_id}/notes", response_model=List[PatientNoteRead])
+def list_patient_notes(patient_id: int, db: Session = Depends(get_db),
+                       user: User = Depends(require_clinical)):
+    notes = patient_service.list_notes(db, patient_id)
+    return [
+        {
+            "id": note.id,
+            "patient_id": note.patient_id,
+            "author_id": note.author_id,
+            "author_name": note.author.full_name,
+            "note": note.note,
+            "created_at": note.created_at,
+        }
+        for note in notes
+    ]
+
+
+@router.post("/{patient_id}/notes", response_model=PatientNoteRead, status_code=201)
+def add_patient_note(patient_id: int, payload: PatientNoteCreate,
+                     db: Session = Depends(get_db),
+                     user: User = Depends(require_clinician)):
+    note = patient_service.add_note(db, patient_id, payload, user)
+    return {
+        "id": note.id,
+        "patient_id": note.patient_id,
+        "author_id": note.author_id,
+        "author_name": user.full_name,
+        "note": note.note,
+        "created_at": note.created_at,
+    }

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import {
-  PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
-  Modal, formatKsh,
+  PageHeader, Card, Button, Input, Spinner, EmptyState,
+  Modal, Icon, formatKsh,
 } from '../components/ui';
 
 // ---------- Status styling ----------
@@ -17,6 +18,8 @@ const STATUS_STYLES = {
 
 export default function Beds() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canManageBeds = user?.role === 'admin';
   const [filter, setFilter] = useState('');  // '' = all
   const [showAdd, setShowAdd] = useState(false);
 
@@ -50,9 +53,9 @@ export default function Beds() {
       <PageHeader
         title="Beds"
         subtitle="Live bed occupancy and status"
-        action={
+        action={canManageBeds && (
           <Button onClick={() => setShowAdd(true)}>+ Add Bed</Button>
-        }
+        )}
       />
 
       {/* Stats bar */}
@@ -79,20 +82,20 @@ export default function Beds() {
       {isLoading ? (
         <Spinner />
       ) : error ? (
-        <Card><EmptyState icon="⚠️" title="Could not load beds" message={error.response?.data?.detail || error.message} /></Card>
+        <Card><EmptyState icon="alert" title="Could not load beds" message={error.response?.data?.detail || error.message} /></Card>
       ) : !beds || beds.length === 0 ? (
         <Card>
           <EmptyState
-            icon="🛏️"
+            icon="bed"
             title={filter ? 'No beds match this filter' : 'No beds yet'}
             message={filter ? 'Try a different status.' : 'Add your first bed to get started.'}
-            action={!filter && <Button onClick={() => setShowAdd(true)}>+ Add Bed</Button>}
+            action={!filter && canManageBeds && <Button onClick={() => setShowAdd(true)}>+ Add Bed</Button>}
           />
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {beds.map((bed) => (
-            <BedCard key={bed.id} bed={bed} onChange={refresh} />
+            {beds.map((bed) => (
+            <BedCard key={bed.id} bed={bed} onChange={refresh} canManage={canManageBeds} />
           ))}
         </div>
       )}
@@ -145,7 +148,7 @@ function FilterChip({ label, active, onClick }) {
 
 
 // ---------- Bed card ----------
-function BedCard({ bed, onChange }) {
+function BedCard({ bed, onChange, canManage }) {
   const [showEdit, setShowEdit] = useState(false);
   const style = STATUS_STYLES[bed.status] || STATUS_STYLES.available;
 
@@ -171,23 +174,23 @@ function BedCard({ bed, onChange }) {
 
         <div className="text-xs space-y-1 text-gray-600 flex-1">
           {bed.location && (
-            <div>📍 {bed.location}</div>
+            <div className="flex items-center gap-1"><Icon name="mapPin" size={14} />{bed.location}</div>
           )}
           <div className="font-medium text-gray-900">
             {formatKsh(bed.daily_rate)}<span className="text-gray-500 font-normal">/day</span>
           </div>
         </div>
 
-        <button
+        {canManage && <button
           onClick={() => setShowEdit(true)}
           className="mt-3 text-xs text-brand-600 hover:text-brand-700 font-medium text-left"
         >
           Edit →
-        </button>
+        </button>}
       </div>
 
       <EditBedModal
-        open={showEdit}
+        open={showEdit && canManage}
         onClose={() => setShowEdit(false)}
         bed={bed}
         onSuccess={() => {

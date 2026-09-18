@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import {
   PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
-  Modal, formatDate,
+  Modal, formatDate, formatDateTime,
 } from '../components/ui';
 
 export default function Patients() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canManagePatients = ['admin', 'receptionist'].includes(user?.role);
+  const canAddNotes = ['admin', 'clinician'].includes(user?.role);
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
 
   const { data: patients, isLoading, error } = useQuery({
     queryKey: ['patients', search],
@@ -25,18 +30,18 @@ export default function Patients() {
       <PageHeader
         title="Patients"
         subtitle="Register and manage patient records"
-        action={
+        action={canManagePatients && (
           <Button onClick={() => setShowRegister(true)}>
             + Register Patient
           </Button>
-        }
+        )}
       />
 
       <Card className="mb-4">
         <div className="p-4">
           <input
             type="text"
-            placeholder="🔍 Search by name, patient number, phone, or ID…"
+            placeholder="Search by name, patient number, phone, or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full border-2 border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
@@ -49,17 +54,17 @@ export default function Patients() {
           <Spinner />
         ) : error ? (
           <EmptyState
-            icon="⚠️"
+            icon="alert"
             title="Could not load patients"
             message={error.response?.data?.detail || error.message}
           />
         ) : !patients || patients.length === 0 ? (
           <EmptyState
-            icon="👤"
+            icon="patients"
             title={search ? 'No matches found' : 'No patients yet'}
             message={search ? `No patients match "${search}"` : 'Register the first patient to get started.'}
             action={
-              !search && (
+              !search && canManagePatients && (
                 <Button onClick={() => setShowRegister(true)}>
                   + Register Patient
                 </Button>
@@ -77,6 +82,7 @@ export default function Patients() {
                   <th className="text-left px-5 py-3 font-medium">Phone</th>
                   <th className="text-left px-5 py-3 font-medium">National ID</th>
                   <th className="text-left px-5 py-3 font-medium">Registered</th>
+                  <th className="text-right px-5 py-3 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -100,6 +106,9 @@ export default function Patients() {
                     <td className="px-5 py-3 text-gray-500 text-xs">
                       {formatDate(p.created_at)}
                     </td>
+                    <td className="px-5 py-3 text-right">
+                      <Button variant="ghost" onClick={() => setSelectedPatient(p)}>View</Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -109,13 +118,118 @@ export default function Patients() {
       </Card>
 
       <RegisterPatientModal
-        open={showRegister}
+        open={showRegister && canManagePatients}
         onClose={() => setShowRegister(false)}
         onSuccess={() => {
           setShowRegister(false);
           qc.invalidateQueries({ queryKey: ['patients'] });
         }}
       />
+
+      <PatientDetailModal
+        patient={selectedPatient}
+        open={!!selectedPatient}
+        canAddNotes={canAddNotes}
+        onClose={() => setSelectedPatient(null)}
+      />
+    </div>
+  );
+}
+
+
+function PatientDetailModal({ patient, open, canAddNotes, onClose }) {
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const qc = useQueryClient();
+
+  const { data: detail, isLoading } = useQuery({
+    queryKey: ['patient', patient?.id],
+    queryFn: async () => (await api.get(`/api/patients/${patient.id}`)).data,
+    enabled: open && !!patient,
+  });
+
+  const { data: notes } = useQuery({
+    queryKey: ['patient-notes', patient?.id],
+    queryFn: async () => (await api.get(`/api/patients/${patient.id}/notes`)).data,
+    enabled: open && !!patient,
+  });
+
+  const noteMutation = useMutation({
+    mutationFn: () => api.post(`/api/patients/${patient.id}/notes`, { note: note.trim() }),
+    onSuccess: () => {
+      setNote('');
+      setError('');
+      qc.invalidateQueries({ queryKey: ['patient-notes', patient.id] });
+    },
+    onError: (err) => setError(err.response?.data?.detail || 'Failed to add treatment note.'),
+  });
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!note.trim()) {
+      setError('Enter a treatment note first.');
+      return;
+    }
+    noteMutation.mutate();
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={patient ? `${patient.full_name} — ${patient.patient_number}` : 'Patient'} width="max-w-2xl">
+      {isLoading ? <Spinner /> : detail && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <Detail label="Gender" value={detail.gender} />
+            <Detail label="Date of birth" value={detail.date_of_birth} />
+            <Detail label="Phone" value={detail.phone} />
+            <Detail label="National ID" value={detail.national_id} />
+            <div className="col-span-2"><Detail label="Patient notes" value={detail.notes} /></div>
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-3">Medical history and treatment notes</h3>
+            {!notes || notes.length === 0 ? (
+              <p className="text-sm text-gray-500">No treatment notes recorded.</p>
+            ) : (
+              <div className="space-y-3 max-h-56 overflow-auto">
+                {notes.map((item) => (
+                  <div key={item.id} className="border-l-4 border-brand-300 bg-gray-50 p-3">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.note}</p>
+                    <p className="text-xs text-gray-500 mt-2">{item.author_name} · {formatDateTime(item.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {canAddNotes && (
+            <form onSubmit={handleSubmit} className="space-y-3 border-t border-gray-100 pt-4">
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <label className="block text-sm font-medium text-gray-700">Add treatment performed</label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                placeholder="Describe treatment, observations, or follow-up..."
+              />
+              <div className="flex justify-end">
+                <Button type="submit" disabled={noteMutation.isPending}>
+                  {noteMutation.isPending ? 'Adding…' : 'Add Note'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function Detail({ label, value }) {
+  return (
+    <div>
+      <div className="text-xs uppercase text-gray-500">{label}</div>
+      <div className="text-gray-800 whitespace-pre-wrap">{value || '—'}</div>
     </div>
   );
 }

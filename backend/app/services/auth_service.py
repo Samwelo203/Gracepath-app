@@ -68,11 +68,25 @@ def update_user(db: Session, user_id: int, data: UserUpdate) -> User:
     if data.email and data.email != user.email:
         if db.query(User).filter(User.email == data.email).first():
             raise HTTPException(409, "Email already in use")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    values = data.model_dump(exclude_unset=True)
+    new_password = values.pop("new_password", None)
+    if new_password:
+        user.hashed_password = hash_password(new_password)
+    for field, value in values.items():
         setattr(user, field, value)
     db.commit()
     db.refresh(user)
     return user
+
+
+def delete_inactive_user(db: Session, user_id: int, admin: User) -> None:
+    user = get_user(db, user_id)
+    if user.id == admin.id:
+        raise HTTPException(400, "You cannot delete your own account")
+    if user.is_active:
+        raise HTTPException(400, "Only inactive users can be deleted")
+    db.delete(user)
+    db.commit()
 
 
 def change_password(db: Session, user: User, data: PasswordChange) -> None:

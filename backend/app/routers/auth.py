@@ -67,6 +67,16 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
 ):
     return auth_service.update_user(db, user_id, payload)
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_inactive_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    auth_service.delete_inactive_user(db, user_id, admin)
+    return None

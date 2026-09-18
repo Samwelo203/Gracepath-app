@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Card, Badge, Spinner, EmptyState, formatKsh, formatDateTime,
+  Card, Badge, Spinner, EmptyState, Icon, formatKsh, formatDateTime,
 } from '../components/ui';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const canViewFinance = ['admin', 'accounts'].includes(user?.role);
 
   const { data: bedStats } = useQuery({
     queryKey: ['beds-stats'],
@@ -19,6 +20,7 @@ export default function Dashboard() {
     queryKey: ['invoices-stats'],
     queryFn: async () => (await api.get('/api/invoices/stats')).data,
     refetchInterval: 30000,
+    enabled: canViewFinance,
   });
 
   const { data: activeAdmissions } = useQuery({
@@ -45,7 +47,7 @@ export default function Dashboard() {
     <div className="p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">
-          Welcome, {user?.full_name?.split(' ')[0]} 👋
+          Welcome, {user?.full_name?.split(' ')[0]}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           {new Date().toLocaleDateString('en-KE', {
@@ -59,7 +61,7 @@ export default function Dashboard() {
         <Link to="/payments" className="block mb-6">
           <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-4 hover:bg-yellow-100 transition-colors">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
+              <Icon name="alert" size={24} />
               <div>
                 <div className="font-semibold text-yellow-900">
                   {unmatched.length} unmatched M-Pesa payment{unmatched.length > 1 ? 's' : ''} need attention
@@ -76,7 +78,7 @@ export default function Dashboard() {
       {/* Top stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
-          icon="🛏️"
+          icon="bed"
           label="Bed Occupancy"
           value={bedStats ? `${bedStats.occupied}/${bedStats.total}` : '—'}
           sub={
@@ -87,26 +89,28 @@ export default function Dashboard() {
           accent={bedStats && bedStats.available === 0 ? 'red' : 'blue'}
         />
         <StatCard
-          icon="🏥"
+          icon="stethoscope"
           label="Active Admissions"
           value={activeAdmissions?.length ?? '—'}
           sub="patients currently admitted"
           accent="purple"
         />
-        <StatCard
-          icon="💰"
-          label="Outstanding"
-          value={invStats ? formatKsh(invStats.total_outstanding) : '—'}
-          sub="unpaid balance across all invoices"
-          accent="red"
-        />
-        <StatCard
-          icon="✅"
-          label="Collected"
-          value={invStats ? formatKsh(invStats.total_paid) : '—'}
-          sub="total M-Pesa payments received"
-          accent="green"
-        />
+        {canViewFinance && <>
+          <StatCard
+            icon="wallet"
+            label="Outstanding"
+            value={invStats ? formatKsh(invStats.total_outstanding) : '—'}
+            sub="unpaid balance across all invoices"
+            accent="red"
+          />
+          <StatCard
+            icon="check"
+            label="Collected"
+            value={invStats ? formatKsh(invStats.total_paid) : '—'}
+            sub="total M-Pesa payments received"
+            accent="green"
+          />
+        </>}
       </div>
 
       {/* Two columns */}
@@ -145,7 +149,7 @@ export default function Dashboard() {
           {!activeAdmissions ? (
             <Spinner />
           ) : activeAdmissions.length === 0 ? (
-            <EmptyState icon="🏥" title="No active admissions" message="Admit a patient to see them here." />
+            <EmptyState icon="stethoscope" title="No active admissions" message="Admit a patient to see them here." />
           ) : (
             <div className="divide-y divide-gray-100 max-h-80 overflow-auto">
               {activeAdmissions.slice(0, 6).map((adm) => (
@@ -182,7 +186,7 @@ export default function Dashboard() {
             {!recentPayments ? (
               <Spinner />
             ) : recentPayments.length === 0 ? (
-              <EmptyState icon="📱" title="No payments yet" />
+              <EmptyState icon="payment" title="No payments yet" />
             ) : (
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -244,7 +248,9 @@ function StatCard({ icon, label, value, sub, accent = 'gray' }) {
   return (
     <Card className={`border-2 ${accents[accent]}`}>
       <div className="p-5">
-        <div className="text-2xl mb-2">{icon}</div>
+        <div className="text-brand-500 mb-2">
+          <Icon name={icon} size={28} strokeWidth={1.8} />
+        </div>
         <div className="text-xs uppercase text-gray-500 font-medium tracking-wide">
           {label}
         </div>

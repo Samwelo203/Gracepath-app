@@ -53,8 +53,8 @@ export default function App() {
               <Route path="patients" element={<Patients />} />
               <Route path="beds" element={<Beds />} />
               <Route path="admissions" element={<Admissions />} />
-              <Route path="invoices" element={<Invoices />} />
-              <Route path="invoices/:id" element={<InvoiceDetail />} />
+              <Route path="invoices" element={<ProtectedRoute roles={['admin', 'accounts']}><Invoices /></ProtectedRoute>} />
+              <Route path="invoices/:id" element={<ProtectedRoute roles={['admin', 'accounts']}><InvoiceDetail /></ProtectedRoute>} />
               <Route
   path="payments"
   element={

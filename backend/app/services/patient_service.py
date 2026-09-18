@@ -3,7 +3,9 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
 from app.models.patient import Patient
-from app.schemas.patient import PatientCreate, PatientUpdate
+from app.models.patient_note import PatientNote
+from app.schemas.patient import PatientCreate, PatientUpdate, PatientNoteCreate
+from app.models.user import User
 from app.services import code_service
 
 
@@ -84,3 +86,22 @@ def delete_patient(db: Session, patient_id: int) -> None:
     patient = get_patient(db, patient_id)
     db.delete(patient)
     db.commit()
+
+
+def list_notes(db: Session, patient_id: int):
+    get_patient(db, patient_id)
+    return (
+        db.query(PatientNote)
+        .filter(PatientNote.patient_id == patient_id)
+        .order_by(PatientNote.created_at.desc(), PatientNote.id.desc())
+        .all()
+    )
+
+
+def add_note(db: Session, patient_id: int, data: PatientNoteCreate, author: User) -> PatientNote:
+    get_patient(db, patient_id)
+    note = PatientNote(patient_id=patient_id, author_id=author.id, note=data.note.strip())
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return note

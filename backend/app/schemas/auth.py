@@ -32,6 +32,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     role: Optional[RoleType] = None
     is_active: Optional[bool] = None
+    new_password: Optional[str] = Field(None, min_length=6, max_length=72)
 
 
 class PasswordChange(BaseModel):
