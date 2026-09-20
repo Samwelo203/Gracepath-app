@@ -24,6 +24,7 @@ class InvoiceItemRead(BaseModel):
 class InvoiceRead(BaseModel):
     id: int
     invoice_number: str
+    account_reference: str
     admission_id: int
     patient_id: int
     subtotal: Decimal
@@ -59,6 +60,7 @@ class ManualCharge(BaseModel):
 class PublicInvoiceView(BaseModel):
     """What a payer sees on the payment page — no internal IDs."""
     invoice_number: str
+    account_reference: str
     patient_name: str
     patient_number: str
     total_amount: Decimal

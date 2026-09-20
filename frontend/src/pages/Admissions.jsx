@@ -19,6 +19,7 @@ export default function Admissions() {
   const { user } = useAuth();
   const canManageAdmissions = ['admin', 'receptionist'].includes(user?.role);
   const [filter, setFilter] = useState('active');  // active | discharged | '' (all)
+  const [search, setSearch] = useState('');
   const [showAdmit, setShowAdmit] = useState(false);
 
   const { data: admissions, isLoading, error } = useQuery({
@@ -33,6 +34,16 @@ export default function Admissions() {
   function refresh() {
     qc.invalidateQueries({ queryKey: ['admissions'] });
   }
+
+  const searchTerm = search.trim().toLowerCase();
+  const filteredAdmissions = (admissions || []).filter((admission) => {
+    if (!searchTerm) return true;
+    return [
+      admission.patient_name,
+      admission.patient_number,
+      admission.admission_number,
+    ].some((value) => value?.toLowerCase().includes(searchTerm));
+  });
 
   return (
     <div className="p-8">
@@ -51,6 +62,20 @@ export default function Admissions() {
         <FilterChip label="All"        active={filter === ''}           onClick={() => setFilter('')} />
       </div>
 
+      <Card className="mb-4">
+        <div className="p-4">
+          <label htmlFor="admission-search" className="sr-only">Search admitted persons</label>
+          <input
+            id="admission-search"
+            type="search"
+            placeholder="Search by patient name or admission number..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full border-2 border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
+          />
+        </div>
+      </Card>
+
       <Card>
         {isLoading ? (
           <Spinner />
@@ -60,13 +85,13 @@ export default function Admissions() {
             title="Could not load admissions"
             message={error.response?.data?.detail || error.message}
           />
-        ) : !admissions || admissions.length === 0 ? (
+        ) : filteredAdmissions.length === 0 ? (
           <EmptyState
             icon="stethoscope"
-            title={filter === 'active' ? 'No active admissions' : 'No admissions found'}
-            message="Admit a patient to get started."
+            title={searchTerm ? 'No matching admissions' : filter === 'active' ? 'No active admissions' : 'No admissions found'}
+            message={searchTerm ? `No admitted person matches "${search}".` : 'Admit a patient to get started.'}
             action={
-              filter === 'active' && canManageAdmissions && (
+              !searchTerm && filter === 'active' && canManageAdmissions && (
                 <Button onClick={() => setShowAdmit(true)}>+ Admit Patient</Button>
               )
             }
@@ -86,7 +111,7 @@ export default function Admissions() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {admissions.map((adm) => (
+                {filteredAdmissions.map((adm) => (
                   <AdmissionRow key={adm.id} admission={adm} onAction={refresh} canManage={canManageAdmissions} />
                 ))}
               </tbody>

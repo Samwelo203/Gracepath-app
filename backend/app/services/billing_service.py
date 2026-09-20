@@ -83,8 +83,16 @@ def create_for_admission(
         return existing
 
     invoice_number = code_service.next_invoice_number(db)
+    # Generate a unique 5-character account reference
+    from app.utils.code_generator import generate_account_reference
+    for _ in range(10):  # retry on collision (extremely unlikely)
+        account_ref = generate_account_reference()
+        if not db.query(Invoice).filter(Invoice.account_reference == account_ref).first():
+            break
+
     inv = Invoice(
         invoice_number=invoice_number,
+        account_reference=account_ref,
         admission_id=adm.id,
         patient_id=adm.patient_id,
         subtotal=Decimal("0"),
@@ -230,6 +238,7 @@ def invoice_detail(db: Session, inv: Invoice) -> dict:
     return {
         "id": inv.id,
         "invoice_number": inv.invoice_number,
+        "account_reference": inv.account_reference,
         "admission_id": inv.admission_id,
         "patient_id": inv.patient_id,
         "subtotal": inv.subtotal,
@@ -252,6 +261,7 @@ def public_view(db: Session, invoice_number: str) -> dict:
     patient = db.query(Patient).filter(Patient.id == inv.patient_id).first()
     return {
         "invoice_number": inv.invoice_number,
+        "account_reference": inv.account_reference,
         "patient_name": patient.full_name if patient else "—",
         "patient_number": patient.patient_number if patient else "—",
         "total_amount": inv.total_amount,

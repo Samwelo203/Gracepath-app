@@ -3,6 +3,7 @@ import {
   AlertTriangle, BedDouble, Check, CircleUserRound, CreditCard,
   FileText, KeyRound, LayoutDashboard, Link, LogOut, MapPin,
   Receipt, Search, ShieldAlert, Stethoscope, UsersRound, Wallet, X,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
 const ICONS = {
@@ -16,9 +17,12 @@ const ICONS = {
   key: KeyRound,
   logout: LogOut,
   mapPin: MapPin,
+  menuClose: PanelLeftClose,
+  menuOpen: PanelLeftOpen,
   patients: UsersRound,
   payment: CreditCard,
   receipt: Receipt,
+  report: FileText,
   search: Search,
   security: ShieldAlert,
   stethoscope: Stethoscope,

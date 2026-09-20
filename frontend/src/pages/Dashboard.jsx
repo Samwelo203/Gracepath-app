@@ -9,6 +9,7 @@ import {
 export default function Dashboard() {
   const { user } = useAuth();
   const canViewFinance = ['admin', 'accounts'].includes(user?.role);
+  const greetingName = user?.username || user?.full_name?.split(' ')[0] || 'User';
 
   const { data: bedStats } = useQuery({
     queryKey: ['beds-stats'],
@@ -45,15 +46,18 @@ export default function Dashboard() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">
-          Welcome, {user?.full_name?.split(' ')[0]}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {new Date().toLocaleDateString('en-KE', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-          })}
-        </p>
+      <div className="mb-6 flex items-center gap-4">
+        <img src="/logo.png" alt="Grace Path Centre logo" className="h-14 w-14 rounded-2xl object-cover shadow-sm ring-1 ring-brand-200 bg-brand-50" />
+        <div>
+          <h1 className="text-2xl font-semibold">
+            Welcome, {greetingName}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {new Date().toLocaleDateString('en-KE', {
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            })}
+          </p>
+        </div>
       </div>
 
       {/* Alerts */}

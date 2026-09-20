@@ -16,3 +16,55 @@ body {
 #root {
   min-height: 100vh;
 }
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .app-sidebar {
+    display: none;
+  }
+
+  .report-toolbar {
+    display: none;
+  }
+
+  .report-page {
+    padding: 0;
+  }
+
+  .report-sheet {
+    width: 100%;
+  }
+
+  .report-letterhead {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .report-logo {
+    width: 140px;
+    height: auto;
+    object-fit: contain;
+  }
+
+  .report-letterhead-copy {
+    text-align: center;
+  }
+
+  .report-sheet section,
+  .report-sheet .rounded-xl {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .report-table tr {
+    break-inside: avoid;
+  }
+}

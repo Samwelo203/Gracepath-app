@@ -31,6 +31,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-500 to-brand-900 p-6">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="bg-brand-500 text-white p-6 text-center">
+          <img src="/logo.png" alt="Grace Path Centre logo" className="mx-auto mb-4 h-16 w-16 rounded-2xl object-contain shadow-md ring-2 ring-white/40 bg-brand-100/20" />
           <h1 className="text-xl font-semibold">Grace Path Centre</h1>
           <p className="text-sm opacity-90 mt-1">Staff Management System</p>
         </div>

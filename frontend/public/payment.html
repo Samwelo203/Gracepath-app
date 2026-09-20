@@ -203,6 +203,7 @@
 <body>
     <div class="card">
         <div class="header">
+            <img src="/logo.png" alt="Grace Path Centre logo" style="display:block; width:72px; height:72px; margin:0 auto 14px; border-radius:16px; background:rgba(255,255,255,0.12); padding:8px; object-fit:contain; box-shadow:0 10px 24px rgba(15,23,42,0.18);">
             <h1>Grace Path Centre</h1>
             <p>Pay Invoice with M-Pesa</p>
         </div>
@@ -376,7 +377,25 @@
 
             const alreadyPaid = Number(inv.amount_paid) > 0;
 
-            $('invoice_details').innerHTML = `
+                        $('invoice_details').innerHTML = `
+                <div class="invoice-detail" style="background:#fef3c7; border-left:4px solid #f59e0b;">
+                    <div style="font-weight:700; font-size:14px; margin-bottom:8px; color:#92400e;">
+                        💳 Pay via M-Pesa (Equity Paybill)
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Paybill</span>
+                        <span class="value" style="font-family:monospace; font-size:16px;">247247</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Account Number</span>
+                        <span class="value" style="font-family:monospace; font-size:20px; color:#0d6e4f; letter-spacing:2px;">
+                            ${inv.account_reference || '—'}
+                        </span>
+                    </div>
+                    <div style="font-size:12px; color:#92400e; margin-top:8px;">
+                        Dial *334# → Pay Bill → Enter 247247 → Account: <strong>${inv.account_reference || '—'}</strong>
+                    </div>
+                </div>
                 <div class="invoice-detail">
                     <div class="detail-row">
                         <span class="label">Invoice</span>

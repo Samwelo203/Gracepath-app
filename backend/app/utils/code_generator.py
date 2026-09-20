@@ -6,6 +6,21 @@ into the human-readable code shown on invoices, receipts, and screens.
 """
 from datetime import datetime
 
+import secrets
+import string
+
+def generate_account_reference() -> str:
+    """
+    Generate a 5-character uppercase code for use as the M-Pesa account number.
+    Format: 3 letters + 2 digits (e.g. 'A7K2M', 'B9X4P')
+    """
+    letters = ''.join(secrets.choice(string.ascii_uppercase) for _ in range(3))
+    digits = ''.join(secrets.choice(string.digits) for _ in range(2))
+    # Shuffle so it's not always AAA11
+    chars = list(letters + digits)
+    secrets.SystemRandom().shuffle(chars)
+    return ''.join(chars)
+
 
 def generate_patient_number(seq: int) -> str:
     return f"GPC-{seq:06d}"

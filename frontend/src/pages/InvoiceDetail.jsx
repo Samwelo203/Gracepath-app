@@ -30,7 +30,11 @@ export default function InvoiceDetail() {
     },
   });
 
-  const { data: transactions } = useQuery({
+  const {
+    data: transactions,
+    isLoading: transactionsLoading,
+    error: transactionsError,
+  } = useQuery({
     queryKey: ['mpesa-transactions', id],
     queryFn: async () => {
       const { data } = await api.get('/api/payments/mpesa/transactions', {
@@ -203,7 +207,15 @@ export default function InvoiceDetail() {
           <h3 className="font-semibold">Payment History</h3>
           <p className="text-xs text-gray-500 mt-1">M-Pesa transactions linked to this invoice</p>
         </div>
-        {!transactions || transactions.length === 0 ? (
+        {transactionsLoading ? (
+          <div className="p-8 text-center text-gray-500 text-sm">
+            Loading payment history...
+          </div>
+        ) : transactionsError ? (
+          <div className="p-8 text-center text-red-600 text-sm">
+            Could not load payment history: {transactionsError.response?.data?.detail || transactionsError.message}
+          </div>
+        ) : !transactions || transactions.length === 0 ? (
           <div className="p-8 text-center text-gray-500 text-sm">
             No payments recorded yet.
           </div>
@@ -416,8 +428,9 @@ function RefreshChargesModal({ open, onClose, invoiceId, onSuccess }) {
       </div>
     </Modal>
   );
+}
 
-  // ---------- Copy payer link button ----------
+// ---------- Copy payer link button ----------
 function CopyLinkButton({ invoiceNumber }) {
   const [copied, setCopied] = useState(false);
 
@@ -440,5 +453,4 @@ function CopyLinkButton({ invoiceNumber }) {
       {copied ? <><Icon name="check" size={16} /> Copied</> : <><Icon name="link" size={16} /> Payer Link</>}
     </Button>
   );
-}
 }

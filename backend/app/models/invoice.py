@@ -39,6 +39,9 @@ class Invoice(Base):
     def __repr__(self):
         return f"<Invoice {self.invoice_number} total={self.total_amount} paid={self.amount_paid} status={self.status}>"
 
+    account_reference = Column(String(5), unique=True, nullable=False, index=True)
+# 5-character code used as the M-Pesa account number for Equity Paybill
+
 
 class InvoiceItem(Base):
     __tablename__ = "invoice_items"

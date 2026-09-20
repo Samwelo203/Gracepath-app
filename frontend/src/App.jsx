@@ -13,6 +13,7 @@ import Invoices from './pages/Invoices';
 import InvoiceDetail from './pages/InvoiceDetail';
 import Users from './pages/Users';
 import Payments from './pages/Payments';
+import Reports from './pages/Reports';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,14 @@ export default function App() {
     </ProtectedRoute>
   }
 />
+              <Route
+                path="reports"
+                element={
+                  <ProtectedRoute roles={['admin']}>
+                    <Reports />
+                  </ProtectedRoute>
+                }
+              />
               <Route
   path="users"
   element={

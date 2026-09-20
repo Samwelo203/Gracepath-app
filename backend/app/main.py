@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pathlib import Path
 
 from app.core.config import settings
@@ -13,7 +14,7 @@ from app.models import (  # noqa: F401
     PatientNote,
 )
 
-from app.routers import patient, bed, admission, invoice, payment, auth
+from app.routers import patient, bed, admission, invoice, payment, auth, equity
 
 
 Base.metadata.create_all(bind=engine)
@@ -42,6 +43,16 @@ PUBLIC_DIR = PROJECT_ROOT / "frontend" / "public"     # payer portal
 DIST_DIR = PROJECT_ROOT / "frontend" / "dist"         # built React app
 
 
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)
+            raise
+
+
 # =========================================================
 # API routes
 # =========================================================
@@ -51,6 +62,7 @@ app.include_router(bed.router)
 app.include_router(admission.router)
 app.include_router(invoice.router)
 app.include_router(payment.router)
+app.include_router(equity.router)
 
 
 # =========================================================
@@ -71,6 +83,30 @@ def root():
 @app.get("/health", tags=["Health"])
 def health():
     return {"status": "ok"}
+
+
+@app.get("/logo.png", include_in_schema=False)
+def logo_png():
+    logo_path = PUBLIC_DIR / "logo.png"
+    if not logo_path.exists():
+        raise StarletteHTTPException(status_code=404, detail="Logo not found")
+    return FileResponse(logo_path)
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon_svg():
+    icon_path = PUBLIC_DIR / "favicon.svg"
+    if not icon_path.exists():
+        raise StarletteHTTPException(status_code=404, detail="Favicon not found")
+    return FileResponse(icon_path)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico():
+    icon_path = PUBLIC_DIR / "favicon.svg"
+    if not icon_path.exists():
+        raise StarletteHTTPException(status_code=404, detail="Favicon not found")
+    return FileResponse(icon_path)
 
 
 # =========================================================
@@ -100,7 +136,7 @@ else:
 if DIST_DIR.exists():
     app.mount(
         "/app",
-        StaticFiles(directory=str(DIST_DIR), html=True),
+        SPAStaticFiles(directory=str(DIST_DIR), html=True),
         name="app",
     )
     print(f"[static] /app  ->  {DIST_DIR}")

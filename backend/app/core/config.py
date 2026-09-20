@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     MPESA_ENV: str = "sandbox"  # sandbox | production
     MPESA_CALLBACK_URL: str = ""
 
+    # ---------- Equity Jenga IPN ----------
+    EQUITY_ENV: str = "sandbox"
+    EQUITY_IPN_USER: str = ""
+    EQUITY_IPN_PASS: str = ""
+    EQUITY_PAYBILL: str = "247247"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES } from '../lib/auth';
@@ -10,6 +11,7 @@ const NAV = [
   { to: '/admissions', label: 'Admissions', icon: 'stethoscope', roles: null },
   { to: '/invoices',   label: 'Invoices',   icon: 'invoice', roles: [ROLES.ADMIN, ROLES.ACCOUNTS] },
   { to: '/payments',   label: 'Payments',   icon: 'payment', roles: [ROLES.ADMIN, ROLES.ACCOUNTS] },
+  { to: '/reports',    label: 'Reports',    icon: 'report',  roles: [ROLES.ADMIN] },
   { to: '/users',      label: 'Users',      icon: 'security', roles: [ROLES.ADMIN] },
 ];
 
@@ -21,6 +23,7 @@ const EXTERNAL_NAV = [
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false);
 
   function handleLogout() {
     logout();
@@ -32,18 +35,27 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      <aside className="w-64 bg-brand-900 text-white flex flex-col">
+      <aside className={`app-sidebar ${collapsed ? 'w-20' : 'w-64'} bg-brand-900 text-white flex flex-col transition-all duration-200`}>
         <div className="p-5 border-b border-brand-700">
-          <div className="flex items-center gap-3">
-            <img src="/app/favicon.svg" alt="" className="w-8 h-8 rounded-lg bg-white p-1" />
-            <div className="text-lg font-semibold">Grace Path Centre</div>
+          <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
+            <img src="/logo.png" alt="Grace Path Centre logo" className="w-10 h-10 rounded-xl object-cover shadow-sm ring-1 ring-white/20 bg-brand-800/60" />
+            {!collapsed && <div className="text-lg font-semibold">Grace Path Centre</div>}
           </div>
-          <div className="text-xs text-brand-100 opacity-80 mt-1">
-            Management System
-          </div>
+          {!collapsed && <div className="text-xs text-brand-100 opacity-80 mt-1">Management System</div>}
         </div>
 
-                <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1">
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            className={`app-sidebar-toggle w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm text-brand-100 hover:bg-brand-700 transition-colors mb-2`}
+            title={collapsed ? 'Expand menu' : 'Minimize menu'}
+            aria-label={collapsed ? 'Expand menu' : 'Minimize menu'}
+          >
+            <Icon name={collapsed ? 'menuOpen' : 'menuClose'} size={18} />
+            {!collapsed && <span>Minimize menu</span>}
+          </button>
+
           {visibleNav.map((item) => (
             <NavLink
               key={item.to}
@@ -56,9 +68,10 @@ export default function Layout() {
                     : 'text-brand-100 hover:bg-brand-700'
                 }`
               }
+              title={collapsed ? item.label : undefined}
             >
               <Icon name={item.icon} size={18} />
-              <span>{item.label}</span>
+              {!collapsed && <span>{item.label}</span>}
             </NavLink>
           ))}
 
@@ -74,24 +87,25 @@ export default function Layout() {
               >
                 <span className="flex items-center gap-3">
                   <Icon name={item.icon} size={18} />
-                  <span>{item.label}</span>
+                  {!collapsed && <span>{item.label}</span>}
                 </span>
-                <span className="text-xs opacity-60">↗</span>
+                {!collapsed && <span className="text-xs opacity-60">↗</span>}
               </a>
             ))}
           </div>
         </nav>
 
         <div className="p-3 border-t border-brand-700">
-          <div className="px-3 py-2 text-xs text-brand-100">
+          {!collapsed && <div className="px-3 py-2 text-xs text-brand-100">
             <div className="font-semibold text-white truncate">{user?.full_name}</div>
             <div className="capitalize opacity-80">{user?.role}</div>
-          </div>
+          </div>}
           <button
             onClick={handleLogout}
-            className="w-full mt-2 text-left px-3 py-2 rounded-lg text-sm text-brand-100 hover:bg-brand-700"
+            className={`w-full mt-2 ${collapsed ? 'text-center' : 'text-left'} px-3 py-2 rounded-lg text-sm text-brand-100 hover:bg-brand-700`}
+            title="Sign out"
           >
-            <span className="flex items-center gap-3"><Icon name="logout" size={18} /> Sign Out</span>
+            <span className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}><Icon name="logout" size={18} />{!collapsed && ' Sign Out'}</span>
           </button>
         </div>
       </aside>
