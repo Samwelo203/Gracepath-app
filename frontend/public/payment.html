@@ -198,6 +198,29 @@
             left: 3px;
             top: 3px;
         }
+        #equity-print { display: none; }
+        @media print {
+            @page { margin: 20mm; }
+            body {
+                display: block;
+                min-height: auto;
+                padding: 0;
+                background: white;
+                color: #111827;
+            }
+            body > .card { display: none; }
+            #equity-print {
+                display: block;
+                max-width: none;
+                padding: 0;
+                font-family: Arial, sans-serif;
+            }
+            #equity-print h1 { margin-bottom: 6px; font-size: 24px; }
+            #equity-print .pdf-subtitle { margin-bottom: 28px; color: #4b5563; }
+            #equity-print .pdf-detail { margin: 12px 0; font-size: 15px; }
+            #equity-print h2 { margin: 28px 0 10px; font-size: 17px; }
+            #pdf-instructions { white-space: pre-line; line-height: 1.7; }
+        }
     </style>
 </head>
 <body>
@@ -205,7 +228,7 @@
         <div class="header">
             <img src="/logo.png" alt="Grace Path Centre logo" style="display:block; width:72px; height:72px; margin:0 auto 14px; border-radius:16px; background:rgba(255,255,255,0.12); padding:8px; object-fit:contain; box-shadow:0 10px 24px rgba(15,23,42,0.18);">
             <h1>Grace Path Centre</h1>
-            <p>Pay Invoice with M-Pesa</p>
+            <p>Pay Invoice via Equity</p>
         </div>
 
         <div class="body">
@@ -231,37 +254,42 @@
                 <div id="payment_message"></div>
 
                 <div class="field">
-                    <label for="phone">Your M-Pesa Phone Number</label>
+                    <label for="equity-phone">Equitel Mobile Number</label>
                     <input
                         type="tel"
-                        id="phone"
+                        id="equity-phone"
                         placeholder="e.g. 0712345678"
                         autocomplete="tel"
+                        inputmode="tel"
                     />
                     <div style="font-size:12px; color:#6b7280; margin-top:4px;">
-                        You will receive a PIN prompt on this number.
+                        Equity will send a secure prompt to this phone. Enter your PIN on your phone, never on this page.
                     </div>
                 </div>
 
                 <div class="field">
-                    <label for="amount">Amount to Pay (KSh)</label>
+                    <label for="equity-amount">Amount to Pay (KSh)</label>
                     <input
                         type="number"
-                        id="amount"
-                        min="1"
-                        step="1"
+                        id="equity-amount"
+                        min="0.01"
+                        step="0.01"
                     />
                     <div style="font-size:12px; color:#6b7280; margin-top:4px;">
-                        Default is the outstanding balance. You may pay less for partial payment.
+                        You can pay part or all of the outstanding balance.
                     </div>
                 </div>
 
-                <button id="btn-pay">
-                    <span id="btn-pay-text">Pay with M-Pesa</span>
+                <button id="btn-equity-push" type="button">
+                    Send Equity PIN Prompt
                 </button>
 
-                <button id="btn-simulate" class="btn-secondary">
-                    Simulate Payment (Test Only)
+                <button id="btn-pay">
+                    <span id="btn-pay-text">View Equity Paybill Instructions</span>
+                </button>
+
+                <button id="btn-print-equity" class="btn-secondary hidden" type="button">
+                    Print / Save as PDF
                 </button>
 
                 <button
@@ -277,6 +305,17 @@
             Grace Path Centre for Palliative Medicine and Advanced Wound Care Services
         </div>
     </div>
+
+    <section id="equity-print" aria-label="Equity payment instructions">
+        <h1>Equity Payment Instructions</h1>
+        <p class="pdf-subtitle">Grace Path Centre</p>
+        <p class="pdf-detail">Invoice: <strong id="pdf-invoice"></strong></p>
+        <p class="pdf-detail">Paybill: <strong id="pdf-paybill"></strong></p>
+        <p class="pdf-detail">Account number: <strong id="pdf-account"></strong></p>
+        <p class="pdf-detail">Amount due: <strong id="pdf-amount"></strong></p>
+        <h2>How to pay</h2>
+        <p id="pdf-instructions"></p>
+    </section>
 
     <script>
         // Same origin as the page — works in Codespaces, local, and production
@@ -377,25 +416,7 @@
 
             const alreadyPaid = Number(inv.amount_paid) > 0;
 
-                        $('invoice_details').innerHTML = `
-                <div class="invoice-detail" style="background:#fef3c7; border-left:4px solid #f59e0b;">
-                    <div style="font-weight:700; font-size:14px; margin-bottom:8px; color:#92400e;">
-                        💳 Pay via M-Pesa (Equity Paybill)
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Paybill</span>
-                        <span class="value" style="font-family:monospace; font-size:16px;">247247</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Account Number</span>
-                        <span class="value" style="font-family:monospace; font-size:20px; color:#0d6e4f; letter-spacing:2px;">
-                            ${inv.account_reference || '—'}
-                        </span>
-                    </div>
-                    <div style="font-size:12px; color:#92400e; margin-top:8px;">
-                        Dial *334# → Pay Bill → Enter 247247 → Account: <strong>${inv.account_reference || '—'}</strong>
-                    </div>
-                </div>
+            $('invoice_details').innerHTML = `
                 <div class="invoice-detail">
                     <div class="detail-row">
                         <span class="label">Invoice</span>
@@ -428,85 +449,100 @@
                 </div>
             `;
 
-            // Pre-fill amount with outstanding balance
             const balance = Number(inv.balance);
 
-if (balance <= 0) {
-    // Invoice is fully settled — disable payment
-    $('amount').value = '0.00';
-    $('amount').disabled = true;
-    $('phone').disabled = true;
-    $('btn-pay').disabled = true;
-    $('btn-simulate').disabled = true;
-    showMessage(
-        'payment_message',
-        '<strong><span class="message-icon" aria-hidden="true"></span>This invoice is fully settled.</strong><br>No further payment is required. Thank you!',
-        'success'
-    );
-} else {
-    $('amount').disabled = false;
-    $('phone').disabled = false;
-    $('btn-pay').disabled = false;
-    $('btn-simulate').disabled = false;
-    $('amount').value = balance.toFixed(2);
-    $('amount').max = balance.toFixed(2);
-}
+            $('btn-pay').disabled = balance <= 0;
+            $('btn-equity-push').disabled = balance <= 0;
+            $('equity-phone').disabled = balance <= 0;
+            $('equity-amount').disabled = balance <= 0;
+            $('equity-amount').value = balance > 0 ? balance.toFixed(2) : '0.00';
+            $('equity-amount').max = balance.toFixed(2);
+            if (balance <= 0) {
+                showMessage(
+                    'payment_message',
+                    '<strong><span class="message-icon" aria-hidden="true"></span>This invoice is fully settled.</strong><br>No further payment is required. Thank you!',
+                    'success'
+                );
+            } else {
+                showMessage('payment_message', '', '');
+            }
         }
 
-        // ---------- STEP 2: Initiate M-Pesa payment ----------
-        async function initiatePayment() {
-            const phone = $('phone').value.trim();
-            const amount = Number($('amount').value);
-
+        // ---------- Equity STK prompt ----------
+        async function sendEquityPrompt() {
+            const phone = $('equity-phone').value.trim();
+            const amount = Number($('equity-amount').value);
             if (!phone) {
-                showMessage('payment_message', 'Please enter your M-Pesa phone number.', 'error');
+                showMessage('payment_message', 'Enter the Equitel mobile number to receive the prompt.', 'error');
                 return;
             }
-            if (!amount || amount <= 0) {
-                showMessage('payment_message', 'Please enter a valid amount.', 'error');
-                return;
-            }
-            if (amount > Number(currentInvoice.balance)) {
-                showMessage('payment_message', 'Amount exceeds outstanding balance.', 'error');
+            if (!Number.isFinite(amount) || amount <= 0 || amount > Number(currentInvoice.balance)) {
+                showMessage('payment_message', 'Enter an amount above zero that does not exceed the balance due.', 'error');
                 return;
             }
 
-            setLoading('btn-pay', true, 'Sending request...');
+            setLoading('btn-equity-push', true, 'Sending prompt...');
             showMessage('payment_message', '', '');
-
             try {
-                const res = await fetch(`${BACKEND_URL}/api/payments/mpesa/stkpush`, {
+                const res = await fetch(`${BACKEND_URL}/api/payments/equity/stk-push`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         invoice_number: currentInvoice.invoice_number,
-                        phone: phone,
-                        amount: amount,
+                        phone,
+                        amount,
                     }),
                 });
+                const data = await res.json();
+                if (!res.ok) {
+                    showMessage('payment_message', data.detail || 'Could not send Equity payment prompt.', 'error');
+                    return;
+                }
+                showMessage(
+                    'payment_message',
+                    `<strong>Payment prompt sent</strong><br>${data.message}<br>Reference: <code>${data.payment_reference}</code>`,
+                    'success'
+                );
+            } catch (err) {
+                showMessage('payment_message', 'Network error: ' + err.message, 'error');
+            } finally {
+                setLoading('btn-equity-push', false);
+            }
+        }
 
+        // ---------- STEP 2: Load Equity payment instructions ----------
+        async function loadPaymentInstructions() {
+            hide('btn-print-equity');
+            setLoading('btn-pay', true, 'Loading instructions...');
+            showMessage('payment_message', '', '');
+
+            try {
+                const res = await fetch(
+                    `${BACKEND_URL}/api/payments/equity/payment-instructions/${encodeURIComponent(currentInvoice.invoice_number)}`
+                );
                 const data = await res.json();
 
                 if (!res.ok) {
-                    showMessage('payment_message', data.detail || 'Payment request failed.', 'error');
+                    showMessage('payment_message', data.detail || 'Could not load Equity payment instructions.', 'error');
                     return;
                 }
 
-                if (data.simulation) {
-                    showMessage(
-                        'payment_message',
-                        `<strong>Simulation mode</strong><br>${data.customer_message}<br><br>
-                         Since Safaricom credentials aren't set up yet, no real PIN prompt was sent.
-                         Use the "Simulate Payment (Test Only)" button below to complete this flow in the test environment.`,
-                        'info'
-                    );
-                } else {
-                    showMessage(
-                        'payment_message',
-                        `<strong>Check your phone!</strong><br>${data.customer_message || 'Enter your M-Pesa PIN to complete the payment.'}`,
-                        'success'
-                    );
-                }
+                $('pdf-invoice').textContent = data.invoice_number;
+                $('pdf-paybill').textContent = data.paybill;
+                $('pdf-account').textContent = data.account_number;
+                $('pdf-amount').textContent = formatKsh(data.amount_due);
+                $('pdf-instructions').textContent = data.instructions;
+                show('btn-print-equity');
+
+                showMessage(
+                    'payment_message',
+                    `<strong>Equity payment instructions</strong><br>
+                     Paybill: <strong>${data.paybill}</strong><br>
+                     Account number: <code>${data.account_number}</code><br>
+                     Amount due: <strong>${formatKsh(data.amount_due)}</strong><br><br>
+                     ${data.instructions.replace(/\n/g, '<br>')}`,
+                    'info'
+                );
             } catch (err) {
                 showMessage('payment_message', 'Network error: ' + err.message, 'error');
             } finally {
@@ -514,62 +550,13 @@ if (balance <= 0) {
             }
         }
 
-        // ---------- STEP 3: Simulate payment (test only) ----------
-        async function simulatePayment() {
-            if (!confirm('This will simulate a successful M-Pesa payment. Continue?')) return;
-
-            const amount = Number($('amount').value);
-            const receipt = 'SIM' + Date.now().toString(36).toUpperCase();
-            const phone = $('phone').value.trim() || '254700000000';
-
-            setLoading('btn-simulate', true, 'Simulating...');
-
-            try {
-                const res = await fetch(`${BACKEND_URL}/api/payments/mpesa/simulate-callback`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        invoice_number: currentInvoice.invoice_number,
-                        amount: amount,
-                        mpesa_receipt: receipt,
-                        payer_name: 'Test Payer',
-                        payer_phone: phone,
-                    }),
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    showMessage('payment_message', data.detail || 'Simulation failed.', 'error');
-                    return;
-                }
-
-                // Refresh invoice
-                const invRes = await fetch(`${BACKEND_URL}/api/invoices/public/${encodeURIComponent(currentInvoice.invoice_number)}`);
-                currentInvoice = await invRes.json();
-                renderInvoice();
-
-                showMessage(
-                    'payment_message',
-                    `<strong><span class="message-icon" aria-hidden="true"></span>Payment recorded!</strong><br>
-                     Receipt: <code>${receipt}</code><br>
-                     Amount: ${formatKsh(amount)}<br>
-                     New balance: ${formatKsh(currentInvoice.balance)}`,
-                    'success'
-                );
-            } catch (err) {
-                showMessage('payment_message', 'Network error: ' + err.message, 'error');
-            } finally {
-                setLoading('btn-simulate', false);
-            }
-        }
-
         // ---------- Reset ----------
         function resetLookup() {
             currentInvoice = null;
             $('invoice_number').value = '';
-            $('phone').value = '';
-            $('amount').value = '';
+            $('equity-phone').value = '';
+            $('equity-amount').value = '';
+            hide('btn-print-equity');
             showMessage('payment_message', '', '');
             hide('step-payment');
             show('step-lookup');
@@ -577,8 +564,9 @@ if (balance <= 0) {
 
         // ---------- Wire up events ----------
         $('btn-lookup').addEventListener('click', lookupInvoice);
-        $('btn-pay').addEventListener('click', initiatePayment);
-        $('btn-simulate').addEventListener('click', simulatePayment);
+        $('btn-equity-push').addEventListener('click', sendEquityPrompt);
+        $('btn-pay').addEventListener('click', loadPaymentInstructions);
+        $('btn-print-equity').addEventListener('click', () => window.print());
         $('btn-new-lookup').addEventListener('click', resetLookup);
 
         $('invoice_number').addEventListener('keypress', (e) => {

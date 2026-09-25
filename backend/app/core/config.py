@@ -26,9 +26,17 @@ class Settings(BaseSettings):
 
     # ---------- Equity Jenga IPN ----------
     EQUITY_ENV: str = "sandbox"
+    EQUITY_MERCHANT_CODE: str = ""
+    EQUITY_CONSUMER_SECRET: str = ""
+    EQUITY_API_KEY: str = ""
     EQUITY_IPN_USER: str = ""
     EQUITY_IPN_PASS: str = ""
     EQUITY_PAYBILL: str = "247247"
+    EQUITY_ACCOUNT_NUMBER: str = ""
+    EQUITY_MERCHANT_NAME: str = "Grace Path Centre"
+    EQUITY_PUSH_CALLBACK_URL: str = ""
+    EQUITY_PUSH_CALLBACK_TOKEN: str = ""
+    EQUITY_PRIVATE_KEY_PATH: str = "~/.JengaApi/keys/privatekey.pem"
 
     class Config:
         env_file = ".env"
