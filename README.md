@@ -4,7 +4,14 @@
 
 Deploy the FastAPI backend and built React app on the same HTTPS origin. The staff app is served at `/app/`, and the payer portal is served at `/pay/payment.html`. HTTPS is required for PWA installation outside localhost.
 
-1. Copy `.env.example` to `backend/.env` and set a unique `SECRET_KEY` (at least 32 characters), a unique `INITIAL_ADMIN_PASSWORD` (at least 16 characters, needed only when provisioning an empty database), the public `ALLOWED_ORIGINS`, and payment-provider credentials/callback URLs. Never commit `backend/.env`.
+1. Copy `.env.example` to `backend/.env`, then generate a unique `SECRET_KEY` and `INITIAL_ADMIN_PASSWORD` with:
+   ```sh
+   sed -i \
+     -e "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -hex 32)|" \
+     -e "s|^INITIAL_ADMIN_PASSWORD=.*|INITIAL_ADMIN_PASSWORD=$(openssl rand -hex 24)|" \
+     backend/.env
+   ```
+   Set the public `ALLOWED_ORIGINS` and payment-provider credentials/callback URLs as well. The admin password is needed only when provisioning an empty database. Never commit `backend/.env`.
 2. Build the image: `docker build -t grace-path-centre .`.
 3. Run it with HTTPS termination at the hosting platform and a persistent database volume:
    ```sh
