@@ -12,7 +12,7 @@ class Invoice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_number = Column(String(30), unique=True, nullable=False, index=True)
-    admission_id = Column(Integer, ForeignKey("admissions.id"), nullable=False, index=True)
+    admission_id = Column(Integer, ForeignKey("admissions.id"), nullable=True, index=True)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
 
     subtotal = Column(Numeric(12, 2), nullable=False, default=0)

@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getUser, saveAuth, clearAuth, isAuthenticated } from '../lib/auth';
 import api from '../lib/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(getUser());
   const [loading, setLoading] = useState(true);
 
@@ -30,12 +32,14 @@ export function AuthProvider({ children }) {
 
   async function login(username, password) {
     const { data } = await api.post('/api/auth/login', { username, password });
+    queryClient.clear();
     saveAuth(data.access_token, data.user);
     setUser(data.user);
     return data.user;
   }
 
   function logout() {
+    queryClient.clear();
     clearAuth();
     setUser(null);
   }

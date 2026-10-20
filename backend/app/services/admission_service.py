@@ -112,8 +112,13 @@ def list_admissions(
     patient_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 200,
+    assigned_clinician_id: Optional[int] = None,
 ):
     q = db.query(Admission)
+    if assigned_clinician_id is not None:
+        q = q.join(Patient, Admission.patient_id == Patient.id).filter(
+            Patient.assigned_clinician_id == assigned_clinician_id
+        )
     if status_filter:
         q = q.filter(Admission.status == status_filter)
     if patient_id:

@@ -18,7 +18,7 @@ const ROLE_OPTIONS = [
   { value: 'admin',        label: 'Admin — full access' },
   { value: 'receptionist', label: 'Receptionist — patients, beds, admissions' },
   { value: 'accounts',     label: 'Accounts — invoices, payments' },
-  { value: 'clinician',    label: 'Clinician — read-only clinical data' },
+  { value: 'clinician',    label: 'Clinician — assigned patients and clinical notes' },
 ];
 
 
@@ -54,7 +54,7 @@ export default function Users() {
             <li className="flex items-center gap-2"><Icon name="security" size={14} /><strong>Admin</strong> — full access to everything, including user management</li>
             <li className="flex items-center gap-2"><Icon name="patients" size={14} /><strong>Receptionist</strong> — patients, beds, admissions (no billing changes)</li>
             <li className="flex items-center gap-2"><Icon name="wallet" size={14} /><strong>Accounts</strong> — invoices, payments, reconciliation</li>
-            <li className="flex items-center gap-2"><Icon name="stethoscope" size={14} /><strong>Clinician</strong> — read-only access to patient and admission data</li>
+            <li className="flex items-center gap-2"><Icon name="stethoscope" size={14} /><strong>Clinician</strong> — access assigned patients and save clinical notes and follow-ups</li>
           </ul>
         </div>
       </Card>

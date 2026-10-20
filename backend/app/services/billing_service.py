@@ -136,9 +136,94 @@ def create_for_admission(
     return inv
 
 
+def create_for_services(
+    db: Session,
+    patient_id: int,
+    items: list,
+    notes: Optional[str] = None,
+    include_accommodation: bool = False,
+    billing_policy: str = "24hr",
+) -> Invoice:
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(404, f"Patient {patient_id} not found")
+
+    invoice_number = code_service.next_invoice_number(db)
+    from app.utils.code_generator import generate_account_reference
+    for _ in range(10):
+        account_ref = generate_account_reference()
+        if not db.query(Invoice).filter(Invoice.account_reference == account_ref).first():
+            break
+
+    inv = Invoice(
+        invoice_number=invoice_number,
+        account_reference=account_ref,
+        patient_id=patient.id,
+        subtotal=Decimal("0"),
+        total_amount=Decimal("0"),
+        amount_paid=Decimal("0"),
+        balance=Decimal("0"),
+        status="unpaid",
+        notes=notes,
+    )
+    db.add(inv)
+    db.flush()
+
+    for item in items:
+        quantity = Decimal(item.quantity)
+        unit_price = Decimal(item.unit_price)
+        db.add(InvoiceItem(
+            invoice_id=inv.id,
+            description=item.description,
+            quantity=quantity,
+            unit_price=unit_price,
+            amount=quantity * unit_price,
+        ))
+
+    if include_accommodation:
+        admission = (
+            db.query(Admission)
+            .filter(Admission.patient_id == patient.id, Admission.status == "active")
+            .order_by(Admission.id.desc())
+            .first()
+        )
+        if not admission:
+            raise HTTPException(400, "This patient has no active admission for accommodation")
+        assignment = (
+            db.query(BedAssignment)
+            .filter(
+                BedAssignment.admission_id == admission.id,
+                BedAssignment.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
+        bed = db.query(Bed).filter(Bed.id == assignment.bed_id).first() if assignment else None
+        if not assignment or not bed:
+            raise HTTPException(400, "This patient has no active bed for accommodation")
+        days = calculate_days(assignment.started_at, admission.discharged_at, billing_policy)
+        quantity = Decimal(days)
+        rate = Decimal(bed.daily_rate)
+        db.add(InvoiceItem(
+            invoice_id=inv.id,
+            description=f"Accommodation ({bed.category})",
+            quantity=quantity,
+            unit_price=rate,
+            amount=quantity * rate,
+        ))
+
+    db.flush()
+    db.refresh(inv)
+    _recalc_totals(inv)
+    db.commit()
+    db.refresh(inv)
+    return inv
+
+
 def refresh_accommodation(db: Session, invoice_id: int, billing_policy: str = "24hr") -> Invoice:
     """Recompute the accommodation line for an active admission."""
     inv = get_invoice(db, invoice_id)
+    if inv.admission_id is None:
+        raise HTTPException(400, "Service invoices do not have accommodation charges")
     adm = db.query(Admission).filter(Admission.id == inv.admission_id).first()
 
     active = (

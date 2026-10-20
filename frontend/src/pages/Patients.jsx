@@ -3,18 +3,28 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
+  PageHeader, Card, Button, Input, Spinner, EmptyState,
   Modal, formatDate, formatDateTime,
 } from '../components/ui';
 
 export default function Patients() {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const canManagePatients = ['admin', 'receptionist'].includes(user?.role);
+  const canManagePatients = user?.role === 'admin';
   const canAddNotes = ['admin', 'clinician'].includes(user?.role);
   const [search, setSearch] = useState('');
   const [showRegister, setShowRegister] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [assignmentError, setAssignmentError] = useState('');
+
+  const { data: clinicians, isLoading: cliniciansLoading } = useQuery({
+    queryKey: ['clinicians'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/auth/users');
+      return data.filter((item) => item.role === 'clinician' && item.is_active);
+    },
+    enabled: canManagePatients,
+  });
 
   const { data: patients, isLoading, error } = useQuery({
     queryKey: ['patients', search],
@@ -25,11 +35,25 @@ export default function Patients() {
     },
   });
 
+  const assignmentMutation = useMutation({
+    mutationFn: ({ patientId, clinicianId }) => api.put(
+      `/api/patients/${patientId}/assignment`,
+      { clinician_id: clinicianId },
+    ),
+    onSuccess: () => {
+      setAssignmentError('');
+      qc.invalidateQueries({ queryKey: ['patients'] });
+    },
+    onError: (err) => setAssignmentError(
+      err.response?.data?.detail || 'Could not update patient assignment.',
+    ),
+  });
+
   return (
     <div className="p-8">
       <PageHeader
         title="Patients"
-        subtitle="Register and manage patient records"
+        subtitle={canManagePatients ? 'Manage patient records and clinician assignments' : 'Patients assigned to you'}
         action={canManagePatients && (
           <Button onClick={() => setShowRegister(true)}>
             + Register Patient
@@ -48,6 +72,10 @@ export default function Patients() {
           />
         </div>
       </Card>
+
+      {assignmentError && (
+        <p role="alert" className="mb-3 text-sm text-red-700">{assignmentError}</p>
+      )}
 
       <Card>
         {isLoading ? (
@@ -81,6 +109,7 @@ export default function Patients() {
                   <th className="text-left px-5 py-3 font-medium">Gender</th>
                   <th className="text-left px-5 py-3 font-medium">Phone</th>
                   <th className="text-left px-5 py-3 font-medium">National ID</th>
+                  {canManagePatients && <th className="text-left px-5 py-3 font-medium">Assigned Clinician</th>}
                   <th className="text-left px-5 py-3 font-medium">Registered</th>
                   <th className="text-right px-5 py-3 font-medium">Action</th>
                 </tr>
@@ -103,6 +132,25 @@ export default function Patients() {
                     <td className="px-5 py-3 text-gray-600">
                       {p.national_id || '—'}
                     </td>
+                    {canManagePatients && (
+                      <td className="px-5 py-3">
+                        <select
+                          aria-label={`Assign ${p.full_name} to a clinician`}
+                          value={p.assigned_clinician_id || ''}
+                          disabled={cliniciansLoading || (assignmentMutation.isPending && assignmentMutation.variables?.patientId === p.id)}
+                          onChange={(event) => assignmentMutation.mutate({
+                            patientId: p.id,
+                            clinicianId: event.target.value ? Number(event.target.value) : null,
+                          })}
+                          className="max-w-52 border border-gray-200 rounded px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                        >
+                          <option value="">Unassigned</option>
+                          {(clinicians || []).map((clinician) => (
+                            <option key={clinician.id} value={clinician.id}>{clinician.full_name}</option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-gray-500 text-xs">
                       {formatDate(p.created_at)}
                     </td>
@@ -127,18 +175,26 @@ export default function Patients() {
       />
 
       <PatientDetailModal
+        key={selectedPatient?.id ?? 'closed'}
         patient={selectedPatient}
         open={!!selectedPatient}
         canAddNotes={canAddNotes}
+        canDelete={canManagePatients}
         onClose={() => setSelectedPatient(null)}
+        onDelete={() => {
+          setSelectedPatient(null);
+          qc.invalidateQueries();
+        }}
       />
     </div>
   );
 }
 
 
-function PatientDetailModal({ patient, open, canAddNotes, onClose }) {
+function PatientDetailModal({ patient, open, canAddNotes, canDelete, onClose, onDelete }) {
   const [note, setNote] = useState('');
+  const [review, setReview] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
   const [error, setError] = useState('');
   const qc = useQueryClient();
 
@@ -155,13 +211,25 @@ function PatientDetailModal({ patient, open, canAddNotes, onClose }) {
   });
 
   const noteMutation = useMutation({
-    mutationFn: () => api.post(`/api/patients/${patient.id}/notes`, { note: note.trim() }),
+    mutationFn: () => api.post(`/api/patients/${patient.id}/notes`, {
+      note: note.trim(),
+      review: review.trim() || null,
+      follow_up_date: followUpDate || null,
+    }),
     onSuccess: () => {
       setNote('');
+      setReview('');
+      setFollowUpDate('');
       setError('');
       qc.invalidateQueries({ queryKey: ['patient-notes', patient.id] });
     },
     onError: (err) => setError(err.response?.data?.detail || 'Failed to add treatment note.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/api/patients/${patient.id}`),
+    onSuccess: onDelete,
+    onError: (err) => setError(err.response?.data?.detail || 'Could not delete patient.'),
   });
 
   function handleSubmit(e) {
@@ -171,6 +239,14 @@ function PatientDetailModal({ patient, open, canAddNotes, onClose }) {
       return;
     }
     noteMutation.mutate();
+  }
+
+  function handleDelete() {
+    const message = `Permanently delete ${patient.full_name} (${patient.patient_number}) and their clinical notes, admissions, invoices, and payment history? This cannot be undone.`;
+    if (window.confirm(message)) {
+      setError('');
+      deleteMutation.mutate();
+    }
   }
 
   return (
@@ -194,6 +270,8 @@ function PatientDetailModal({ patient, open, canAddNotes, onClose }) {
                 {notes.map((item) => (
                   <div key={item.id} className="border-l-4 border-brand-300 bg-gray-50 p-3">
                     <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.note}</p>
+                    {item.review && <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap"><strong>Review:</strong> {item.review}</p>}
+                    {item.follow_up_date && <p className="mt-2 text-xs font-medium text-brand-700">Follow-up: {formatDate(item.follow_up_date)}</p>}
                     <p className="text-xs text-gray-500 mt-2">{item.author_name} · {formatDateTime(item.created_at)}</p>
                   </div>
                 ))}
@@ -204,20 +282,48 @@ function PatientDetailModal({ patient, open, canAddNotes, onClose }) {
           {canAddNotes && (
             <form onSubmit={handleSubmit} className="space-y-3 border-t border-gray-100 pt-4">
               {error && <p className="text-sm text-red-600">{error}</p>}
-              <label className="block text-sm font-medium text-gray-700">Add treatment performed</label>
+              <label className="block text-sm font-medium text-gray-700">Clinical note *</label>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
                 className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-                placeholder="Describe treatment, observations, or follow-up..."
+                placeholder="Record the treatment or encounter..."
+              />
+              <label className="block text-sm font-medium text-gray-700" htmlFor="patient-review">Review / assessment</label>
+              <textarea
+                id="patient-review"
+                value={review}
+                onChange={(e) => setReview(e.target.value)}
+                rows={2}
+                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                placeholder="Clinical review or assessment..."
+              />
+              <Input
+                label="Follow-up date"
+                type="date"
+                value={followUpDate}
+                onChange={(e) => setFollowUpDate(e.target.value)}
               />
               <div className="flex justify-end">
                 <Button type="submit" disabled={noteMutation.isPending}>
-                  {noteMutation.isPending ? 'Adding…' : 'Add Note'}
+                  {noteMutation.isPending ? 'Saving…' : 'Save Clinical Note'}
                 </Button>
               </div>
             </form>
+          )}
+
+          {canDelete && (
+            <div className="flex justify-end border-t border-gray-100 pt-4">
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting…' : 'Delete Patient and Records'}
+              </Button>
+            </div>
           )}
         </div>
       )}

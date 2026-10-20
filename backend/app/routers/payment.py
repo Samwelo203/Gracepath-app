@@ -6,12 +6,30 @@ from decimal import Decimal
 from app.db.session import get_db
 from app.schemas.mpesa import (
     STKPushRequest, STKPushResponse, MpesaTransactionRead, SimulationCallback,
+    CashPaymentCreate,
 )
 from app.services import payment_service, mpesa_client, billing_service
 from app.core.security import require_accounts
 from app.models.user import User
 
 router = APIRouter(prefix="/api/payments/mpesa", tags=["M-Pesa Payments"])
+
+
+@router.post("/cash", response_model=MpesaTransactionRead, status_code=201)
+def record_cash_payment(
+    payload: CashPaymentCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_accounts),
+):
+    """Record and approve cash received against an invoice."""
+    return payment_service.record_cash_payment(
+        db,
+        invoice_number=payload.invoice_number,
+        amount=payload.amount,
+        payer_name=payload.payer_name,
+        approved_by_id=user.id,
+        approved_by_name=user.full_name,
+    )
 
 
 # ---------- STK Push ----------

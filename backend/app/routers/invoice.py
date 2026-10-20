@@ -5,7 +5,7 @@ from typing import List, Optional
 from app.db.session import get_db
 from app.schemas.invoice import (
     InvoiceRead, InvoiceDetail, InvoiceFromAdmission, ManualCharge,
-    PublicInvoiceView,
+    PublicInvoiceView, ServiceInvoiceCreate,
 )
 from app.services import billing_service as svc
 from app.core.security import require_accounts, require_clinical
@@ -31,6 +31,20 @@ def stats(db: Session = Depends(get_db),
 def create_invoice(payload: InvoiceFromAdmission, db: Session = Depends(get_db),
                      user: User = Depends(require_accounts)):
     inv = svc.create_for_admission(db, payload.admission_id, payload.notes)
+    return svc.invoice_detail(db, inv)
+
+
+@router.post("/services", response_model=InvoiceDetail, status_code=201)
+def create_service_invoice(payload: ServiceInvoiceCreate, db: Session = Depends(get_db),
+                           user: User = Depends(require_accounts)):
+    inv = svc.create_for_services(
+        db,
+        payload.patient_id,
+        payload.items,
+        payload.notes,
+        payload.include_accommodation,
+        payload.billing_policy,
+    )
     return svc.invoice_detail(db, inv)
 
 

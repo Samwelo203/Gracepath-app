@@ -37,7 +37,7 @@ def generate_bed_number(seq: int) -> str:
 
 def generate_invoice_number(seq: int, year: int | None = None) -> str:
     year = year or datetime.now().year
-    return f"INV-{year}-{seq:06d}"
+    return f"GP-{year}-{seq:06d}"
 
 
 def generate_payment_reference(seq: int, year: int | None = None) -> str:

@@ -2,7 +2,7 @@
 import {
   AlertTriangle, BedDouble, Check, CircleUserRound, CreditCard,
   FileText, KeyRound, LayoutDashboard, Link, LogOut, MapPin,
-  Receipt, Search, ShieldAlert, Stethoscope, UsersRound, Wallet, X,
+  Download, Receipt, Search, ShieldAlert, Stethoscope, UsersRound, Wallet, X,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 
@@ -11,6 +11,7 @@ const ICONS = {
   bed: BedDouble,
   check: Check,
   dashboard: LayoutDashboard,
+  download: Download,
   empty: FileText,
   invoice: Receipt,
   link: Link,

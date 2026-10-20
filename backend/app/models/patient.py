@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.session import Base
@@ -19,8 +20,15 @@ class Patient(Base):
     next_of_kin_name = Column(String(150), nullable=True)
     next_of_kin_phone = Column(String(20), nullable=True)
     notes = Column(Text, nullable=True)
+    assigned_clinician_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    assigned_clinician = relationship("User", foreign_keys=[assigned_clinician_id])
+
+    @property
+    def assigned_clinician_name(self):
+        return self.assigned_clinician.full_name if self.assigned_clinician else None
 
     def __repr__(self):
         return f"<Patient {self.patient_number} {self.full_name}>"

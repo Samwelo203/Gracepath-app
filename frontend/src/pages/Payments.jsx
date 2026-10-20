@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { jsPDF } from 'jspdf';
 import api from '../lib/api';
 import {
   PageHeader, Card, Button, Input, Badge, Spinner, EmptyState,
@@ -18,6 +19,7 @@ export default function Payments() {
   const qc = useQueryClient();
   const [tab, setTab] = useState('all');  // all | unmatched
   const [filter, setFilter] = useState('');
+  const [showCashModal, setShowCashModal] = useState(false);
 
   const { data: transactions, isLoading, error } = useQuery({
     queryKey: ['mpesa-transactions', tab, filter],
@@ -37,13 +39,12 @@ export default function Payments() {
     qc.invalidateQueries({ queryKey: ['mpesa-transactions'] });
   }
 
-  const unmatchedCount = tab === 'unmatched' ? (transactions?.length || 0) : null;
-
   return (
     <div className="p-8">
       <PageHeader
-        title="M-Pesa Payments"
-        subtitle="Transaction history and unmatched payment reconciliation"
+        title="Payments"
+        subtitle="Transaction history, cash approvals and unmatched M-Pesa reconciliation"
+        action={<Button onClick={() => setShowCashModal(true)}>Record Cash Payment</Button>}
       />
 
       {/* Tabs */}
@@ -101,13 +102,12 @@ export default function Payments() {
                   <th className="text-left px-5 py-3 font-medium">Receipt</th>
                   <th className="text-left px-5 py-3 font-medium">Invoice</th>
                   <th className="text-left px-5 py-3 font-medium">Payer</th>
+                  <th className="text-left px-5 py-3 font-medium">Method</th>
                   <th className="text-left px-5 py-3 font-medium">Phone</th>
                   <th className="text-right px-5 py-3 font-medium">Amount</th>
                   <th className="text-left px-5 py-3 font-medium">Status</th>
                   <th className="text-left px-5 py-3 font-medium">Received</th>
-                  {tab === 'unmatched' && (
-                    <th className="text-right px-5 py-3 font-medium">Action</th>
-                  )}
+                  <th className="text-right px-5 py-3 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -116,6 +116,7 @@ export default function Payments() {
                     key={tx.id}
                     tx={tx}
                     showLinkAction={tab === 'unmatched'}
+                    showReceiptAction={tab === 'all'}
                     onLink={refresh}
                   />
                 ))}
@@ -124,13 +125,22 @@ export default function Payments() {
           </div>
         )}
       </Card>
+
+      <CashPaymentModal
+        open={showCashModal}
+        onClose={() => setShowCashModal(false)}
+        onSuccess={() => {
+          setShowCashModal(false);
+          refresh();
+        }}
+      />
     </div>
   );
 }
 
 
 // ---------- Row ----------
-function TransactionRow({ tx, showLinkAction, onLink }) {
+function TransactionRow({ tx, showLinkAction, showReceiptAction, onLink }) {
   const [showLink, setShowLink] = useState(false);
 
   return (
@@ -153,7 +163,11 @@ function TransactionRow({ tx, showLinkAction, onLink }) {
             </span>
           )}
         </td>
-        <td className="px-5 py-3 text-gray-700">{tx.payer_name || '—'}</td>
+        <td className="px-5 py-3 text-gray-700">
+          {tx.payer_name || '—'}
+          {tx.approved_by && <span className="block text-xs text-gray-500">Approved by {tx.approved_by}</span>}
+        </td>
+        <td className="px-5 py-3 capitalize text-gray-700">{tx.payment_method || 'mpesa'}</td>
         <td className="px-5 py-3 text-gray-600 font-mono text-xs">
           {tx.payer_phone || '—'}
         </td>
@@ -166,11 +180,12 @@ function TransactionRow({ tx, showLinkAction, onLink }) {
         <td className="px-5 py-3 text-gray-500 text-xs">
           {formatDateTime(tx.received_at)}
         </td>
-        {showLinkAction && (
-          <td className="px-5 py-3 text-right">
-            <Button onClick={() => setShowLink(true)}>Link to Invoice</Button>
-          </td>
-        )}
+        <td className="px-5 py-3 text-right whitespace-nowrap">
+          {showReceiptAction && tx.invoice_id && tx.status === 'success' && (
+            <ReceiptDownloadButton transaction={tx} />
+          )}
+          {showLinkAction && <Button onClick={() => setShowLink(true)}>Link to Invoice</Button>}
+        </td>
       </tr>
 
       <LinkToInvoiceModal
@@ -184,6 +199,171 @@ function TransactionRow({ tx, showLinkAction, onLink }) {
       />
     </>
   );
+}
+
+
+function CashPaymentModal({ open, onClose, onSuccess }) {
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [amount, setAmount] = useState('');
+  const [payerName, setPayerName] = useState('');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () => api.post('/api/payments/mpesa/cash', {
+      invoice_number: invoiceNumber.trim().toUpperCase(),
+      amount,
+      payer_name: payerName.trim() || null,
+    }),
+    onSuccess,
+    onError: (err) => setError(err.response?.data?.detail || 'Could not record cash payment.'),
+  });
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    mutation.mutate();
+  }
+
+  function handleClose() {
+    setInvoiceNumber('');
+    setAmount('');
+    setPayerName('');
+    setError('');
+    onClose();
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Approve Cash Payment">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        <Input
+          label="Invoice Number *"
+          required
+          value={invoiceNumber}
+          onChange={(event) => setInvoiceNumber(event.target.value.toUpperCase())}
+          placeholder="e.g. INV-2026-000001"
+        />
+        <Input
+          label="Amount received (KSh) *"
+          type="number"
+          min="0.01"
+          step="0.01"
+          required
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
+        <Input
+          label="Payer name"
+          value={payerName}
+          onChange={(event) => setPayerName(event.target.value)}
+          placeholder="Optional"
+        />
+        <p className="text-xs text-gray-500">This records cash received against the invoice and updates its balance immediately.</p>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
+          <Button type="submit" disabled={mutation.isPending}>
+            {mutation.isPending ? 'Approving…' : 'Approve Payment'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ReceiptDownloadButton({ transaction }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function downloadReceipt() {
+    setLoading(true);
+    setError('');
+    try {
+      const { data: invoice } = await api.get(`/api/invoices/${transaction.invoice_id}`);
+      const pdf = new jsPDF();
+      const logo = await loadLogoData();
+      if (logo) pdf.addImage(logo, 'PNG', 15, 12, 22, 22);
+
+      pdf.setFontSize(18);
+      pdf.text('Grace Path Centre', 43, 20);
+      pdf.setFontSize(10);
+      pdf.text('For Palliative Medicine and Advanced Wound Care Services', 43, 27);
+      pdf.setFontSize(16);
+      pdf.text('PAYMENT RECEIPT', 15, 46);
+      pdf.setFontSize(10);
+
+      const rows = [
+        ['Receipt number', transaction.transaction_id],
+        ['Invoice', invoice.invoice_number],
+        ...(invoice.admission_number ? [['Admission', invoice.admission_number]] : []),
+        ['Patient', invoice.patient_name || transaction.payer_name || '—'],
+        ['Patient number', invoice.patient_number || '—'],
+        ['Payment method', transaction.payment_method === 'cash' ? 'Cash' : 'M-Pesa'],
+        ['Received', formatDateTime(transaction.received_at)],
+        ['Approved by', transaction.approved_by || '—'],
+      ];
+      let y = 57;
+      for (const [label, value] of rows) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`${label}:`, 15, y);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(String(value), 57, y);
+        y += 7;
+      }
+
+      y += 4;
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Payment purpose / invoice items', 15, y);
+      y += 7;
+      pdf.setFont('helvetica', 'normal');
+      const items = invoice.items?.length
+        ? invoice.items
+        : [{ description: invoice.admission_number ? `Admission ${invoice.admission_number}` : 'Invoice services', amount: invoice.total_amount }];
+      for (const item of items) {
+        const descriptionLines = pdf.splitTextToSize(item.description, 135);
+        pdf.text(descriptionLines, 15, y);
+        pdf.text(formatKsh(item.amount), 155, y, { align: 'right' });
+        y += Math.max(7, descriptionLines.length * 5);
+        if (y > 270) {
+          pdf.addPage();
+          y = 20;
+        }
+      }
+
+      y += 4;
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Amount received', 15, y);
+      pdf.text(formatKsh(transaction.amount), 195, y, { align: 'right' });
+      y += 7;
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Balance remaining: ${formatKsh(invoice.balance)}`, 15, y);
+      pdf.save(`Grace-Path-Receipt-${transaction.transaction_id}.pdf`);
+    } catch (downloadError) {
+      setError(downloadError.response?.data?.detail || 'Could not generate receipt.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-col items-end">
+      <Button variant="secondary" onClick={downloadReceipt} disabled={loading}>
+        {loading ? 'Preparing…' : 'Download Receipt'}
+      </Button>
+      {error && <span role="alert" className="mt-1 text-xs text-red-600">{error}</span>}
+    </span>
+  );
+}
+
+async function loadLogoData() {
+  const response = await fetch('/logo.png');
+  if (!response.ok) return null;
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 

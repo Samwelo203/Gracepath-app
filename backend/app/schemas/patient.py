@@ -33,17 +33,31 @@ class PatientUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class PatientAssignmentUpdate(BaseModel):
+    clinician_id: Optional[int] = Field(...)
+
+
 class PatientRead(PatientBase):
     id: int
     patient_number: str
+    assigned_clinician_id: Optional[int] = None
+    assigned_clinician_name: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
+class PatientOptionRead(BaseModel):
+    id: int
+    patient_number: str
+    full_name: str
+
+
 class PatientNoteCreate(BaseModel):
     note: str = Field(..., min_length=1, max_length=5000)
+    review: Optional[str] = Field(None, max_length=5000)
+    follow_up_date: Optional[date] = None
 
 
 class PatientNoteRead(BaseModel):
@@ -52,6 +66,8 @@ class PatientNoteRead(BaseModel):
     author_id: int
     author_name: str
     note: str
+    review: Optional[str] = None
+    follow_up_date: Optional[date] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

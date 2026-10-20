@@ -15,8 +15,16 @@ from app.schemas.admission import (
 from app.services import admission_service as svc
 from app.core.security import require_staff, require_clinical
 from app.models.user import User
+from app.services import patient_service
 
 router = APIRouter(prefix="/api/admissions", tags=["Admissions"])
+
+
+def _get_admission_for_user(db: Session, admission_id: int, user: User):
+    admission = svc.get_admission(db, admission_id)
+    if user.role == "clinician":
+        patient_service.get_patient_for_user(db, admission.patient_id, user)
+    return admission
 
 
 # ---------- Admission CRUD ----------
@@ -36,13 +44,16 @@ def list_admissions(
     db: Session = Depends(get_db),
     user: User = Depends(require_clinical),
 ):
-    return svc.list_admissions(db, status_filter, patient_id, skip, limit)
+    assigned_clinician_id = user.id if user.role == "clinician" else None
+    return svc.list_admissions(
+        db, status_filter, patient_id, skip, limit, assigned_clinician_id
+    )
 
 
 @router.get("/{admission_id}", response_model=AdmissionWithPatient)
 def get_admission(admission_id: int, db: Session = Depends(get_db),
                     user: User = Depends(require_clinical)):
-    adm = svc.get_admission(db, admission_id)
+    adm = _get_admission_for_user(db, admission_id, user)
     return svc.admission_with_patient(db, adm)
 
 
@@ -74,7 +85,7 @@ def transfer_bed(
 @router.get("/{admission_id}/current-bed", response_model=Optional[BedAssignmentRead])
 def current_bed(admission_id: int, db: Session = Depends(get_db),
                   user: User = Depends(require_clinical)):
-    svc.get_admission(db, admission_id)
+    _get_admission_for_user(db, admission_id, user)
     return svc.get_active_assignment(db, admission_id)
 
 

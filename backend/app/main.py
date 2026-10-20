@@ -19,6 +19,87 @@ from app.routers import patient, bed, admission, invoice, payment, auth, equity
 
 Base.metadata.create_all(bind=engine)
 
+
+def _migrate_invoice_admission_nullable():
+    """Allow invoices for registered patients who have no admission."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    from sqlalchemy import text
+    with engine.begin() as connection:
+        columns = connection.execute(text("PRAGMA table_info(invoices)")).fetchall()
+        admission = next((column for column in columns if column[1] == "admission_id"), None)
+        if not admission or not admission[3]:
+            return
+        connection.execute(text("ALTER TABLE invoices RENAME TO invoices_legacy"))
+        connection.execute(text("""
+            CREATE TABLE invoices (
+                id INTEGER NOT NULL PRIMARY KEY,
+                invoice_number VARCHAR(30) NOT NULL,
+                admission_id INTEGER,
+                patient_id INTEGER NOT NULL,
+                subtotal NUMERIC(12, 2) NOT NULL,
+                total_amount NUMERIC(12, 2) NOT NULL,
+                amount_paid NUMERIC(12, 2) NOT NULL,
+                balance NUMERIC(12, 2) NOT NULL,
+                status VARCHAR(20) NOT NULL,
+                issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                due_date DATE,
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME,
+                account_reference VARCHAR(5) NOT NULL
+            )
+        """))
+        connection.execute(text("""
+            INSERT INTO invoices
+            SELECT id, invoice_number, admission_id, patient_id, subtotal, total_amount,
+                   amount_paid, balance, status, issued_at, due_date, notes,
+                   created_at, updated_at, account_reference
+            FROM invoices_legacy
+        """))
+        connection.execute(text("CREATE UNIQUE INDEX ix_invoices_invoice_number ON invoices (invoice_number)"))
+        connection.execute(text("CREATE INDEX ix_invoices_id ON invoices (id)"))
+        connection.execute(text("CREATE INDEX ix_invoices_admission_id ON invoices (admission_id)"))
+        connection.execute(text("CREATE INDEX ix_invoices_patient_id ON invoices (patient_id)"))
+        connection.execute(text("CREATE INDEX ix_invoices_status ON invoices (status)"))
+        connection.execute(text("CREATE UNIQUE INDEX ix_invoices_account_reference ON invoices (account_reference)"))
+        connection.execute(text("DROP TABLE invoices_legacy"))
+
+
+_migrate_invoice_admission_nullable()
+
+
+def _migrate_patient_clinical_fields():
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    from sqlalchemy import inspect, text
+
+    with engine.begin() as connection:
+        patient_columns = {
+            column["name"] for column in inspect(connection).get_columns("patients")
+        }
+        note_columns = {
+            column["name"] for column in inspect(connection).get_columns("patient_notes")
+        }
+        if "assigned_clinician_id" not in patient_columns:
+            connection.execute(text(
+                "ALTER TABLE patients ADD COLUMN assigned_clinician_id INTEGER "
+                "REFERENCES users(id)"
+            ))
+            connection.execute(text(
+                "CREATE INDEX ix_patients_assigned_clinician_id "
+                "ON patients (assigned_clinician_id)"
+            ))
+        if "review" not in note_columns:
+            connection.execute(text("ALTER TABLE patient_notes ADD COLUMN review TEXT"))
+        if "follow_up_date" not in note_columns:
+            connection.execute(text(
+                "ALTER TABLE patient_notes ADD COLUMN follow_up_date DATE"
+            ))
+
+
+_migrate_patient_clinical_fields()
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,

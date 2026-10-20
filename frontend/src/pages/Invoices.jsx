@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import {
-  PageHeader, Card, Button, Badge, Spinner, EmptyState, formatKsh, formatDateTime,
+  PageHeader, Card, Button, Badge, Spinner, EmptyState, Modal, Input, formatKsh, formatDateTime,
 } from '../components/ui';
 
 const STATUS_COLORS = {
@@ -17,6 +17,7 @@ const STATUS_COLORS = {
 export default function Invoices() {
   const [filter, setFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [showServiceInvoice, setShowServiceInvoice] = useState(false);
 
   const { data: invoices, isLoading, error } = useQuery({
     queryKey: ['invoices', filter],
@@ -51,6 +52,7 @@ export default function Invoices() {
       <PageHeader
         title="Invoices"
         subtitle="Billing, payments, and outstanding balances"
+        action={<Button onClick={() => setShowServiceInvoice(true)}>+ Service Invoice</Button>}
       />
 
       {/* Stats */}
@@ -153,7 +155,113 @@ export default function Invoices() {
           </div>
         )}
       </Card>
+
+      <ServiceInvoiceModal
+        open={showServiceInvoice}
+        onClose={() => setShowServiceInvoice(false)}
+      />
     </div>
+  );
+}
+
+function ServiceInvoiceModal({ open, onClose }) {
+  const [patientId, setPatientId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [includeAccommodation, setIncludeAccommodation] = useState(false);
+  const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: '' }]);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const { data: patients, isLoading: patientsLoading } = useQuery({
+    queryKey: ['patients-for-invoice'],
+    queryFn: async () => (await api.get('/api/patients/options', { params: { limit: 500 } })).data,
+    enabled: open,
+  });
+
+  const mutation = useMutation({
+    mutationFn: (payload) => api.post('/api/invoices/services', payload),
+    onSuccess: (response) => navigate(`/invoices/${response.data.id}`),
+    onError: (err) => setError(err.response?.data?.detail || 'Could not create invoice.'),
+  });
+
+  function updateItem(index, field, value) {
+    setItems((current) => current.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [field]: value } : item
+    )));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    if (!patientId || items.some((item) => !item.description.trim() || Number(item.quantity) <= 0 || Number(item.unit_price) < 0)) {
+      setError('Select a patient and complete every service line.');
+      return;
+    }
+    mutation.mutate({
+      patient_id: Number(patientId),
+      notes: notes || null,
+      include_accommodation: includeAccommodation,
+      items: items.map((item) => ({
+        description: item.description.trim(),
+        quantity: Number(item.quantity),
+        unit_price: Number(item.unit_price),
+      })),
+    });
+  }
+
+  function handleClose() {
+    setPatientId('');
+    setNotes('');
+    setIncludeAccommodation(false);
+    setItems([{ description: '', quantity: 1, unit_price: '' }]);
+    setError('');
+    onClose();
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Generate Service Invoice">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <div className="bg-red-50 border-l-4 border-red-500 text-red-700 text-sm p-3 rounded">{error}</div>}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Registered patient *</label>
+          <select value={patientId} onChange={(event) => setPatientId(event.target.value)} required className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+            <option value="">{patientsLoading ? 'Loading patients...' : 'Select a patient'}</option>
+            {(patients || []).map((patient) => <option key={patient.id} value={patient.id}>{patient.full_name} ({patient.patient_number})</option>)}
+          </select>
+        </div>
+        <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 accent-brand-500"
+            checked={includeAccommodation}
+            onChange={(event) => setIncludeAccommodation(event.target.checked)}
+          />
+          <span>
+            <span className="block font-medium">Add accommodation</span>
+            <span className="block text-xs text-gray-500 mt-0.5">Include the current bed charge and number of days in this invoice.</span>
+          </span>
+        </label>
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-gray-50 px-3 py-2 text-xs font-semibold uppercase text-gray-500">Services performed</div>
+          <div className="p-3 space-y-3">
+            {items.map((item, index) => (
+              <div key={index} className="grid grid-cols-[1fr_5rem_7rem_auto] gap-2 items-end">
+                <Input label={index === 0 ? 'Description *' : ''} value={item.description} onChange={(event) => updateItem(index, 'description', event.target.value)} placeholder="e.g. Consultation" required />
+                <Input label={index === 0 ? 'Qty *' : ''} type="number" min="0.01" step="0.01" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} required />
+                <Input label={index === 0 ? 'Unit price *' : ''} type="number" min="0" step="0.01" value={item.unit_price} onChange={(event) => updateItem(index, 'unit_price', event.target.value)} required />
+                <button type="button" className="h-10 px-2 text-red-500 hover:text-red-700" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={items.length === 1} title="Remove service">×</button>
+              </div>
+            ))}
+            <Button type="button" variant="secondary" onClick={() => setItems((current) => [...current, { description: '', quantity: 1, unit_price: '' }])}>+ Add service</Button>
+          </div>
+        </div>
+        <Input label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional invoice notes" />
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
+          <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Generating...' : 'Generate Invoice'}</Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

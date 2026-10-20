@@ -124,6 +124,35 @@ def record_failed_payment(
     return tx
 
 
+def record_cash_payment(
+    db: Session,
+    *,
+    invoice_number: str,
+    amount: Decimal,
+    payer_name: Optional[str],
+    approved_by_id: int,
+    approved_by_name: str,
+) -> MpesaTransaction:
+    inv = billing_service.get_invoice_by_number(db, invoice_number)
+    amount = Decimal(amount)
+    if amount > Decimal(inv.balance):
+        raise HTTPException(400, "Cash payment cannot exceed the invoice balance")
+
+    return record_successful_payment(
+        db,
+        transaction_id=f"CASH-{uuid.uuid4().hex[:12].upper()}",
+        amount=amount,
+        account_reference=inv.invoice_number,
+        payer_name=payer_name,
+        raw_payload={
+            "payment_method": "cash",
+            "approved_by_id": approved_by_id,
+            "approved_by_name": approved_by_name,
+        },
+        result_desc=f"Cash payment approved by {approved_by_name}",
+    )
+
+
 # ---------- Unmatched queue ----------
 def list_unmatched(db: Session):
     return (

@@ -25,7 +25,7 @@ class InvoiceRead(BaseModel):
     id: int
     invoice_number: str
     account_reference: str
-    admission_id: int
+    admission_id: Optional[int] = None
     patient_id: int
     subtotal: Decimal
     total_amount: Decimal
@@ -49,6 +49,14 @@ class InvoiceDetail(InvoiceRead):
 class InvoiceFromAdmission(BaseModel):
     admission_id: int
     notes: Optional[str] = None
+
+
+class ServiceInvoiceCreate(BaseModel):
+    patient_id: int
+    notes: Optional[str] = None
+    include_accommodation: bool = False
+    billing_policy: str = "24hr"
+    items: List[InvoiceItemCreate] = Field(..., min_length=1)
 
 
 class ManualCharge(BaseModel):

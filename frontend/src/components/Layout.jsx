@@ -6,7 +6,7 @@ import { Icon } from './ui';
 
 const NAV = [
   { to: '/',           label: 'Dashboard',  icon: 'dashboard', roles: null },
-  { to: '/patients',   label: 'Patients',   icon: 'patients', roles: null },
+  { to: '/patients',   label: 'Patients',   icon: 'patients', roles: [ROLES.ADMIN, ROLES.CLINICIAN] },
   { to: '/beds',       label: 'Beds',       icon: 'bed', roles: null },
   { to: '/admissions', label: 'Admissions', icon: 'stethoscope', roles: null },
   { to: '/invoices',   label: 'Invoices',   icon: 'invoice', roles: [ROLES.ADMIN, ROLES.ACCOUNTS] },

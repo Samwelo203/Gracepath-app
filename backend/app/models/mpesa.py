@@ -32,5 +32,15 @@ class MpesaTransaction(Base):
 
     invoice = relationship("Invoice", backref="mpesa_transactions")
 
+    @property
+    def payment_method(self):
+        return "cash" if self.transaction_id.startswith("CASH-") else "mpesa"
+
+    @property
+    def approved_by(self):
+        if self.payment_method != "cash" or not self.raw_payload:
+            return None
+        return self.raw_payload.get("approved_by_name")
+
     def __repr__(self):
         return f"<MpesaTransaction {self.transaction_id} {self.amount} {self.status}>"

@@ -75,40 +75,69 @@ export default function InvoiceDetail() {
   const balance = Number(invoice.balance);
   const paid = Number(invoice.amount_paid);
   const total = Number(invoice.total_amount);
+  const amountDue = Math.max(0, balance);
   const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <button
-        onClick={() => navigate('/invoices')}
-        className="text-sm text-gray-500 hover:text-gray-700 mb-4"
-      >
-        ← Back to Invoices
-      </button>
+    <div className="invoice-detail-page p-8 max-w-5xl mx-auto">
+      <div className="invoice-toolbar">
+        <button
+          onClick={() => navigate('/invoices')}
+          className="text-sm text-gray-500 hover:text-gray-700 mb-4"
+        >
+          ← Back to Invoices
+        </button>
 
-      <PageHeader
-        title={`Invoice ${invoice.invoice_number}`}
-        subtitle={
-          <>
-            {invoice.patient_name} <span className="font-mono text-xs ml-1">({invoice.patient_number})</span>
-            {invoice.admission_number && (
-              <> · Admission <span className="font-mono">{invoice.admission_number}</span></>
-            )}
-          </>
-        }
+        <PageHeader
+          title={`Invoice ${invoice.invoice_number}`}
+          subtitle={
+            <>
+              {invoice.patient_name} <span className="font-mono text-xs ml-1">({invoice.patient_number})</span>
+              {invoice.admission_number && (
+                <> · Admission <span className="font-mono">{invoice.admission_number}</span></>
+              )}
+            </>
+          }
                 action={
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => window.print()}>
+              <><Icon name="download" size={16} /> Generate PDF</>
+            </Button>
             <CopyLinkButton invoiceNumber={invoice.invoice_number} />
             <Button variant="secondary" onClick={() => setShowRefresh(true)}>
               <><Icon name="receipt" size={16} /> Refresh Charges</>
             </Button>
             <Button onClick={() => setShowAddCharge(true)}>+ Add Charge</Button>
           </div>
-        }
-      />
+          }
+        />
+      </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="invoice-print-sheet">
+        <div className="invoice-letterhead hidden print:flex">
+          <img src="/logo.png" alt="Grace Path Centre logo" className="invoice-logo" />
+          <div className="invoice-letterhead-copy">
+            <h1>Gracepath Center for Palliative Medicine</h1>
+            <p>Palliative &amp; Home-Based Care Services</p>
+            <p>Issued: {formatDateTime(invoice.issued_at)}</p>
+          </div>
+        </div>
+
+        <div className="invoice-print-heading hidden print:flex">
+          <div>
+            <div className="text-xs font-bold text-gray-700">Bill To:</div>
+            <div className="font-semibold">{invoice.patient_name}</div>
+            <div className="text-xs text-gray-500">{invoice.patient_number}</div>
+          </div>
+          <div className="text-right">
+            <div className="invoice-print-title">INVOICE</div>
+            <div className="text-sm"><strong>Invoice No:</strong> {invoice.invoice_number}</div>
+            <div className="text-sm"><strong>Date:</strong> {new Date(invoice.issued_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+          </div>
+        </div>
+
+        {/* Summary cards */}
+        <div className="invoice-screen-summary grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-5">
           <div className="text-xs uppercase text-gray-500 font-medium mb-1">Status</div>
           <Badge color={STATUS_COLORS[invoice.status] || 'gray'}>
@@ -134,9 +163,9 @@ export default function InvoiceDetail() {
         </Card>
       </div>
 
-      {/* Payment progress */}
-      {total > 0 && (
-        <Card className="p-5 mb-6">
+        {/* Payment progress */}
+        {total > 0 && (
+        <Card className="invoice-screen-summary p-5 mb-6">
           <div className="flex justify-between text-xs text-gray-500 mb-2">
             <span>Payment progress</span>
             <span>{progress.toFixed(0)}%</span>
@@ -150,9 +179,9 @@ export default function InvoiceDetail() {
         </Card>
       )}
 
-      {/* Items */}
-      <Card className="mb-6">
-        <div className="p-5 border-b border-gray-100">
+        {/* Items */}
+        <Card className="mb-6 invoice-items-card">
+        <div className="p-5 border-b border-gray-100 invoice-items-heading">
           <h3 className="font-semibold">Items</h3>
         </div>
         {invoice.items.length === 0 ? (
@@ -163,16 +192,18 @@ export default function InvoiceDetail() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
+                <th className="text-left px-5 py-3 font-medium invoice-print-only">No.</th>
                 <th className="text-left px-5 py-3 font-medium">Description</th>
                 <th className="text-right px-5 py-3 font-medium">Qty</th>
                 <th className="text-right px-5 py-3 font-medium">Unit Price</th>
                 <th className="text-right px-5 py-3 font-medium">Amount</th>
-                <th className="w-12"></th>
+                <th className="w-12 invoice-action-column"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {invoice.items.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-5 py-3 text-gray-600 invoice-print-only">{invoice.items.indexOf(item) + 1}</td>
                   <td className="px-5 py-3 text-gray-800">{item.description}</td>
                   <td className="px-5 py-3 text-right text-gray-600">{item.quantity}</td>
                   <td className="px-5 py-3 text-right text-gray-600">
@@ -181,7 +212,7 @@ export default function InvoiceDetail() {
                   <td className="px-5 py-3 text-right font-medium">
                     {formatKsh(item.amount)}
                   </td>
-                  <td className="px-2 py-3 text-right">
+                  <td className="px-2 py-3 text-right invoice-action-column">
                     <button
                       onClick={() => {
                         if (confirm('Remove this item?')) {
@@ -199,10 +230,30 @@ export default function InvoiceDetail() {
             </tbody>
           </table>
         )}
-      </Card>
+        </Card>
+
+        <div className="hidden print:block invoice-print-total">
+          <div><span>Subtotal</span><strong>{formatKsh(total)}</strong></div>
+          <div className="invoice-total-due"><span>TOTAL DUE</span><strong>{formatKsh(amountDue)}</strong></div>
+        </div>
+        <div className="hidden print:block invoice-print-note">
+          <strong>Amount in words:</strong> {amountInWords(amountDue)} Kenya Shillings only.
+        </div>
+        <div className="hidden print:flex invoice-authorisation">
+          <div>
+            <strong>Gracepath Center for Palliative Medicine</strong>
+            <span>Palliative &amp; Home-Based Care Services</span>
+          </div>
+          <div className="invoice-authoriser">
+            <div><strong>Authorized By:</strong> Maxwell Awuor</div>
+            <div className="invoice-signature">Maxwell Awuor</div>
+            <div className="invoice-signature-line">Electronic signature</div>
+          </div>
+        </div>
+      </div>
 
       {/* Payment history */}
-      <Card>
+      <Card className="invoice-screen-only">
         <div className="p-5 border-b border-gray-100">
           <h3 className="font-semibold">Payment History</h3>
           <p className="text-xs text-gray-500 mt-1">M-Pesa transactions linked to this invoice</p>
@@ -281,6 +332,22 @@ export default function InvoiceDetail() {
       />
     </div>
   );
+}
+
+function amountInWords(value) {
+  const number = Math.round(Number(value));
+  if (number === 0) return 'Zero';
+  const ones = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  function underThousand(valueToConvert) {
+    if (valueToConvert < 20) return ones[valueToConvert];
+    if (valueToConvert < 100) return `${tens[Math.floor(valueToConvert / 10)]}${valueToConvert % 10 ? `-${ones[valueToConvert % 10].toLowerCase()}` : ''}`;
+    return `${ones[Math.floor(valueToConvert / 100)]} hundred${valueToConvert % 100 ? ` and ${underThousand(valueToConvert % 100).toLowerCase()}` : ''}`;
+  }
+  if (number < 1000) return underThousand(number);
+  const thousands = Math.floor(number / 1000);
+  const remainder = number % 1000;
+  return `${underThousand(thousands)} thousand${remainder ? ` ${underThousand(remainder).toLowerCase()}` : ''}`;
 }
 
 

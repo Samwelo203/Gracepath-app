@@ -295,7 +295,7 @@ function AdmitPatientModal({ open, onClose, onSuccess }) {
     queryKey: ['patients-lookup', search],
     queryFn: async () => {
       const params = search ? { q: search } : {};
-      const { data } = await api.get('/api/patients', { params });
+      const { data } = await api.get('/api/patients/options', { params });
       return data;
     },
     enabled: open,

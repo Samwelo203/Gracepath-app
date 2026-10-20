@@ -28,6 +28,8 @@ class STKPushResponse(BaseModel):
 class MpesaTransactionRead(BaseModel):
     id: int
     transaction_id: str
+    payment_method: str = "mpesa"
+    approved_by: Optional[str] = None
     invoice_id: Optional[int] = None
     invoice_number: Optional[str] = None
     amount: Decimal
@@ -49,3 +51,9 @@ class SimulationCallback(BaseModel):
     mpesa_receipt: str = Field(..., min_length=6)
     payer_name: str = "Test Payer"
     payer_phone: str = "254700000000"
+
+
+class CashPaymentCreate(BaseModel):
+    invoice_number: str = Field(..., min_length=5, max_length=30)
+    amount: Decimal = Field(..., gt=0)
+    payer_name: Optional[str] = Field(None, max_length=150)
