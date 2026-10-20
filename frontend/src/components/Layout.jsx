@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLES } from '../lib/auth';
-import { Icon } from './ui';
+import { Button, Icon, Modal } from './ui';
 
 const NAV = [
   { to: '/',           label: 'Dashboard',  icon: 'dashboard', roles: null },
@@ -38,7 +38,7 @@ export default function Layout() {
       <aside className={`app-sidebar ${collapsed ? 'w-20' : 'w-64'} bg-brand-900 text-white flex flex-col transition-all duration-200`}>
         <div className="p-5 border-b border-brand-700">
           <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
-            <img src="/logo.png" alt="Grace Path Centre logo" className="w-10 h-10 rounded-xl object-cover shadow-sm ring-1 ring-white/20 bg-brand-800/60" />
+            <img src="/app/logo.png" alt="Grace Path Centre logo" className="w-10 h-10 rounded-xl object-cover shadow-sm ring-1 ring-white/20 bg-brand-800/60" />
             {!collapsed && <div className="text-lg font-semibold">Grace Path Centre</div>}
           </div>
           {!collapsed && <div className="text-xs text-brand-100 opacity-80 mt-1">Management System</div>}
@@ -93,6 +93,8 @@ export default function Layout() {
               </a>
             ))}
           </div>
+
+          <InstallAppButton collapsed={collapsed} />
         </nav>
 
         <div className="p-3 border-t border-brand-700">
@@ -114,5 +116,78 @@ export default function Layout() {
         <Outlet />
       </main>
     </div>
+  );
+}
+
+function InstallAppButton({ collapsed }) {
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const checkInstalled = () => setIsInstalled(
+      window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
+    );
+    const handleInstallPrompt = () => setInstallPrompt(window.gracePathInstallPrompt || null);
+    const handleInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    };
+
+    checkInstalled();
+    handleInstallPrompt();
+    window.addEventListener('gracepathinstallprompt', handleInstallPrompt);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
+      window.removeEventListener('gracepathinstallprompt', handleInstallPrompt);
+      window.removeEventListener('appinstalled', handleInstalled);
+    };
+  }, []);
+
+  async function handleInstall() {
+    if (!installPrompt) {
+      setShowInstructions(true);
+      return;
+    }
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome !== 'accepted') setInstallPrompt(null);
+  }
+
+  if (isInstalled) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleInstall}
+        className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm text-brand-100 hover:bg-brand-700 transition-colors`}
+        title="Install Grace Path app"
+        aria-label="Install Grace Path app"
+      >
+        <Icon name="download" size={18} />
+        {!collapsed && <span>Install App</span>}
+      </button>
+      <Modal
+        open={showInstructions}
+        onClose={() => setShowInstructions(false)}
+        title="Install Grace Path"
+      >
+        <div className="space-y-4 text-sm text-gray-700">
+          <p>Install this staff app on your device for a dedicated app window and faster access.</p>
+          <div>
+            <h3 className="font-semibold text-gray-900">Chrome or Edge</h3>
+            <p>Open the browser menu and choose “Install Grace Path” or “Install page as app”.</p>
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900">iPhone or iPad</h3>
+            <p>Tap Share in Safari, then choose “Add to Home Screen”.</p>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowInstructions(false)}>Done</Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }

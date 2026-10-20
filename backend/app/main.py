@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse, FileResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pathlib import Path
 
-from app.core.config import settings
+from app.core.config import settings, validate_deployment_settings
 from app.db.session import Base, engine
 
 from app.models import (  # noqa: F401
@@ -17,6 +17,7 @@ from app.models import (  # noqa: F401
 from app.routers import patient, bed, admission, invoice, payment, auth, equity
 
 
+validate_deployment_settings()
 Base.metadata.create_all(bind=engine)
 
 
@@ -108,7 +109,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

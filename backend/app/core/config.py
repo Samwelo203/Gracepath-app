@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 
 class Settings(BaseSettings):
@@ -12,6 +13,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
+    ALLOWED_ORIGINS: str = "*"
+    INITIAL_ADMIN_USERNAME: str = "admin"
+    INITIAL_ADMIN_EMAIL: str = "admin@gracepath.local"
+    INITIAL_ADMIN_PASSWORD: str = ""
 
     # ---------- Database ----------
     DATABASE_URL: str = "sqlite:///./gracepath.db"
@@ -50,3 +55,20 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+def validate_deployment_settings() -> None:
+    if settings.DEBUG:
+        return
+    if settings.SECRET_KEY == "change-me" or len(settings.SECRET_KEY) < 32:
+        raise RuntimeError("Set SECRET_KEY to a random value of at least 32 characters")
+    origins = [origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",")]
+    if not origins or "*" in origins:
+        raise RuntimeError("Set ALLOWED_ORIGINS to the deployed application origin(s)")
+    parsed_origins = [urlsplit(origin) for origin in origins]
+    if any(
+        origin.scheme != "https" or not origin.netloc or origin.path
+        or origin.query or origin.fragment
+        for origin in parsed_origins
+    ):
+        raise RuntimeError("ALLOWED_ORIGINS must contain HTTPS origins")

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from app.models.user import User
 from app.schemas.auth import UserCreate, UserUpdate, PasswordChange
+from app.core.config import settings
 from app.core.security import hash_password, verify_password
 
 
@@ -97,16 +98,21 @@ def change_password(db: Session, user: User, data: PasswordChange) -> None:
 
 
 def ensure_default_admin(db: Session) -> None:
-    """Create default admin on first run if no users exist."""
+    """Create the configured first admin when the user table is empty."""
     if db.query(User).count() == 0:
+        password = settings.INITIAL_ADMIN_PASSWORD
+        if settings.DEBUG and not password:
+            password = "GracePath2026!"
+        if len(password) < 16:
+            raise RuntimeError("Set INITIAL_ADMIN_PASSWORD before first production startup")
         admin = User(
-            username="admin",
+            username=settings.INITIAL_ADMIN_USERNAME,
             full_name="System Administrator",
-            email="admin@gracepath.local",
-            hashed_password=hash_password("GracePath2026!"),
+            email=settings.INITIAL_ADMIN_EMAIL,
+            hashed_password=hash_password(password),
             role="admin",
             is_active=True,
         )
         db.add(admin)
         db.commit()
-        print("[auth] Created default admin -> username: admin  password: GracePath2026!")
+        print(f"[auth] Created initial admin account: {settings.INITIAL_ADMIN_USERNAME}")
