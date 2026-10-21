@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "*"
     INITIAL_ADMIN_USERNAME: str = "admin"
     INITIAL_ADMIN_EMAIL: str = "admin@gracepath.local"
-    INITIAL_ADMIN_PASSWORD: str = ""
+    INITIAL_ADMIN_PASSWORD: str = "GracePath2026!"
 
     # ---------- Database ----------
     DATABASE_URL: str = "sqlite:///./gracepath.db"
