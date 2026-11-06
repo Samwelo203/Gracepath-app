@@ -80,9 +80,31 @@ def _assert_bed_free(db: Session, bed_id: int) -> Bed:
 
 # ---------- Admission lifecycle ----------
 def create_admission(db: Session, data: AdmissionCreate) -> Admission:
-    patient = db.query(Patient).filter(Patient.id == data.patient_id).first()
+    # Lock the patient row so simultaneous admission requests for the same
+    # patient cannot both pass the active-admission check (on databases that
+    # support row-level locking).
+    patient = (
+        db.query(Patient)
+        .filter(Patient.id == data.patient_id)
+        .with_for_update()
+        .first()
+    )
     if not patient:
         raise HTTPException(404, f"Patient {data.patient_id} not found")
+
+    active_admission = (
+        db.query(Admission)
+        .filter(
+            Admission.patient_id == patient.id,
+            Admission.status == "active",
+        )
+        .first()
+    )
+    if active_admission:
+        raise HTTPException(
+            409,
+            "This patient already has an active admission. Discharge the patient before re-admitting.",
+        )
 
     admission_number = code_service.next_admission_number(db)
     admitted_at = (
