@@ -20,11 +20,14 @@ export default function Admissions() {
     queryKey: ['admissions', filter],
     queryFn: async () => (await api.get('/api/admissions', { params: filter ? { status: filter } : {} })).data,
   });
+
   function refresh() {
     qc.invalidateQueries({ queryKey: ['admissions'] });
     qc.invalidateQueries({ queryKey: ['beds-available'] });
     qc.invalidateQueries({ queryKey: ['invoices'] });
+    qc.invalidateQueries({ queryKey: ['patients-lookup'] });
   }
+
   const term = search.trim().toLowerCase();
   const rows = (admissions || []).filter((item) => !term || [item.patient_name, item.patient_number, item.admission_number].some((value) => value?.toLowerCase().includes(term)));
 
@@ -54,7 +57,7 @@ function AdmissionRow({ admission, onAction, canManage, canDischarge }) {
       <td className="px-5 py-3 text-xs">{formatDateTime(admission.admitted_at)}</td>
       <td className="px-5 py-3 text-xs">{admission.discharged_at ? formatDateTime(admission.discharged_at) : '—'}</td>
       <td className="px-5 py-3"><Badge color={STATUS_COLORS[admission.status] || 'gray'}>{admission.status}</Badge></td>
-      {canManage && <td className="px-5 py-3 text-right"><div className="flex gap-1 justify-end">{active && !bed && <Button onClick={() => setAssignOpen(true)}>Assign Bed</Button>}{active && bed && <Button variant="secondary" onClick={() => setTransferOpen(true)}>Transfer</Button>}{canDischarge && active && <Button variant="danger" onClick={() => setDischargeOpen(true)}>Discharge</Button>}</div></td>}
+      {canManage && <td className="px-5 py-3 text-right"><div className="flex gap-1 justify-end">{active && !bed && <Button onClick={() => setAssignOpen(true)}>Assign Bed</Button>}{active && bed && <Button variant="secondary" onClick={() => setTransferOpen(true)}>Transfer Bed</Button>}{canDischarge && active && <Button variant="danger" onClick={() => setDischargeOpen(true)}>Discharge</Button>}</div></td>}
     </tr>
     <BedModal open={assignOpen} onClose={() => setAssignOpen(false)} admission={admission} onSuccess={() => { setAssignOpen(false); onAction(); }} />
     <BedModal open={transferOpen} onClose={() => setTransferOpen(false)} admission={admission} transfer onSuccess={() => { setTransferOpen(false); onAction(); }} />
@@ -67,12 +70,20 @@ function AdmitModal({ open, onClose, onSuccess }) {
   const [date, setDate] = useState(localToday);
   const [reason, setReason] = useState('');
   const [search, setSearch] = useState('');
+  const [bedId, setBedId] = useState('');
   const [error, setError] = useState('');
   const { data: patients } = useQuery({ queryKey: ['patients-lookup', search], queryFn: async () => (await api.get('/api/patients/options', { params: search ? { q: search } : {} })).data, enabled: open });
+  const { data: beds, isLoading: bedsLoading } = useQuery({ queryKey: ['beds-available'], queryFn: async () => (await api.get('/api/beds', { params: { status: 'available' } })).data, enabled: open });
   const mutation = useMutation({ mutationFn: (payload) => api.post('/api/admissions', payload), onSuccess, onError: (err) => setError(err.response?.data?.detail || 'Could not admit patient.') });
-  function submit(event) { event.preventDefault(); setError(''); if (!patientId) return setError('Select a patient.'); if (!date || date > localToday()) return setError('Admission date must be today or earlier.'); mutation.mutate({ patient_id: Number(patientId), admission_date: date, reason: reason || null }); }
-  function close() { setPatientId(''); setDate(localToday()); setReason(''); setSearch(''); setError(''); onClose(); }
-  return <Modal open={open} onClose={close} title="Admit Patient"><form onSubmit={submit} className="space-y-4">{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<label className="block text-sm">Search patients<input value={search} onChange={(event) => setSearch(event.target.value)} className="mt-1 w-full border rounded px-3 py-2" /></label><label className="block text-sm">Patient *<select required value={patientId} onChange={(event) => setPatientId(event.target.value)} className="mt-1 w-full border rounded px-3 py-2"><option value="">Select a patient</option>{(patients || []).map((patient) => <option key={patient.id} value={patient.id}>{patient.full_name} ({patient.patient_number})</option>)}</select></label><label className="block text-sm">Admission date *<input type="date" required max={localToday()} value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full border rounded px-3 py-2" /></label><label className="block text-sm">Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1 w-full border rounded px-3 py-2" rows={3} /></label><div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={close}>Cancel</Button><Button type="submit" disabled={mutation.isPending || !patientId}>{mutation.isPending ? 'Admitting…' : 'Admit Patient'}</Button></div></form></Modal>;
+  function submit(event) {
+    event.preventDefault();
+    setError('');
+    if (!patientId) return setError('Select a patient.');
+    if (!date || date > localToday()) return setError('Admission date must be today or earlier.');
+    mutation.mutate({ patient_id: Number(patientId), admission_date: date, bed_id: bedId ? Number(bedId) : null, reason: reason || null });
+  }
+  function close() { setPatientId(''); setDate(localToday()); setReason(''); setSearch(''); setBedId(''); setError(''); onClose(); }
+  return <Modal open={open} onClose={close} title="Admit Patient"><form onSubmit={submit} className="space-y-4">{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<label className="block text-sm">Search patients<input value={search} onChange={(event) => setSearch(event.target.value)} className="mt-1 w-full border rounded px-3 py-2" /></label><label className="block text-sm">Patient *<select required value={patientId} onChange={(event) => setPatientId(event.target.value)} className="mt-1 w-full border rounded px-3 py-2"><option value="">Select a patient</option>{(patients || []).map((patient) => <option key={patient.id} value={patient.id}>{patient.full_name} ({patient.patient_number})</option>)}</select></label><label className="block text-sm">Admission date *<input type="date" required max={localToday()} value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full border rounded px-3 py-2" /></label><label className="block text-sm">Bed (optional)<select value={bedId} onChange={(event) => setBedId(event.target.value)} className="mt-1 w-full border rounded px-3 py-2"><option value="">Admit without a bed</option>{(beds || []).map((bed) => <option key={bed.id} value={bed.id}>{bed.bed_number} · {bed.category} · KSh {bed.daily_rate}/day</option>)}</select>{bedsLoading && <span className="text-xs text-gray-500">Loading available beds…</span>}{!bedsLoading && beds?.length === 0 && <span className="text-xs text-gray-500">No beds are currently available.</span>}</label><label className="block text-sm">Reason<textarea value={reason} onChange={(event) => setReason(event.target.value)} className="mt-1 w-full border rounded px-3 py-2" rows={3} /></label><div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={close}>Cancel</Button><Button type="submit" disabled={mutation.isPending || !patientId}>{mutation.isPending ? 'Admitting…' : 'Admit Patient'}</Button></div></form></Modal>;
 }
 
 function BedModal({ open, onClose, admission, transfer = false, onSuccess }) {

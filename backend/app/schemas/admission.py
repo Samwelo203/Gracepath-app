@@ -7,6 +7,7 @@ from typing import Optional
 class AdmissionCreate(BaseModel):
     patient_id: int
     admission_date: Optional[date] = None
+    bed_id: Optional[int] = None
     reason: Optional[str] = None
     notes: Optional[str] = None
 

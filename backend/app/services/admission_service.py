@@ -59,7 +59,12 @@ def get_active_assignment(db: Session, admission_id: int) -> Optional[BedAssignm
 
 
 def _assert_bed_free(db: Session, bed_id: int) -> Bed:
-    bed = db.query(Bed).filter(Bed.id == bed_id).first()
+    bed = (
+        db.query(Bed)
+        .filter(Bed.id == bed_id)
+        .with_for_update()
+        .first()
+    )
     if not bed:
         raise HTTPException(404, f"Bed {bed_id} not found")
 
@@ -71,18 +76,29 @@ def _assert_bed_free(db: Session, bed_id: int) -> Bed:
         )
         .first()
     )
-    if conflict:
-        raise HTTPException(409, f"Bed {bed.bed_number} is already occupied.")
-    if bed.status == "maintenance":
-        raise HTTPException(400, f"Bed {bed.bed_number} is under maintenance.")
+    if conflict or bed.status != "available":
+        raise HTTPException(409, f"Bed {bed.bed_number} is not available.")
     return bed
+
+
+def _new_assignment(db: Session, admission: Admission, bed: Bed, notes: Optional[str] = None) -> BedAssignment:
+    assignment = BedAssignment(
+        assignment_number=code_service.next_assignment_number(db),
+        admission_id=admission.id,
+        bed_id=bed.id,
+        started_at=admission.admitted_at,
+        is_active=True,
+        notes=notes,
+    )
+    db.add(assignment)
+    bed.status = "occupied"
+    return assignment
 
 
 # ---------- Admission lifecycle ----------
 def create_admission(db: Session, data: AdmissionCreate) -> Admission:
     # Lock the patient row so simultaneous admission requests for the same
-    # patient cannot both pass the active-admission check (on databases that
-    # support row-level locking).
+    # patient cannot both pass the active-admission check where supported.
     patient = (
         db.query(Patient)
         .filter(Patient.id == data.patient_id)
@@ -94,10 +110,7 @@ def create_admission(db: Session, data: AdmissionCreate) -> Admission:
 
     active_admission = (
         db.query(Admission)
-        .filter(
-            Admission.patient_id == patient.id,
-            Admission.status == "active",
-        )
+        .filter(Admission.patient_id == patient.id, Admission.status == "active")
         .first()
     )
     if active_admission:
@@ -106,6 +119,9 @@ def create_admission(db: Session, data: AdmissionCreate) -> Admission:
             "This patient already has an active admission. Discharge the patient before re-admitting.",
         )
 
+    # Validate/lock a selected bed before writing the admission so the patient
+    # and bed assignment are committed together.
+    bed = _assert_bed_free(db, data.bed_id) if data.bed_id is not None else None
     admission_number = code_service.next_admission_number(db)
     admitted_at = (
         datetime.combine(data.admission_date, datetime.min.time(), tzinfo=timezone.utc)
@@ -121,10 +137,15 @@ def create_admission(db: Session, data: AdmissionCreate) -> Admission:
         status="active",
     )
     db.add(adm)
+    db.flush()
+
+    if bed:
+        _new_assignment(db, adm, bed)
+
     db.commit()
     db.refresh(adm)
 
-    # Auto-create invoice for this admission
+    # Auto-create invoice, including accommodation when a bed was selected.
     try:
         from app.services import billing_service
         billing_service.create_for_admission(db, adm.id)
@@ -188,25 +209,10 @@ def assign_bed(db: Session, data: BedAssignmentCreate) -> BedAssignment:
         raise HTTPException(400, "Admission already has an active bed assignment. Use transfer.")
 
     bed = _assert_bed_free(db, data.bed_id)
-
-    assignment_number = code_service.next_assignment_number(db)
-    assignment = BedAssignment(
-        assignment_number=assignment_number,
-        admission_id=adm.id,
-        bed_id=bed.id,
-        started_at=adm.admitted_at,
-        is_active=True,
-        notes=data.notes,
-    )
-    db.add(assignment)
-    bed.status = "occupied"
-
+    assignment = _new_assignment(db, adm, bed, data.notes)
     db.commit()
     db.refresh(assignment)
-
-    # Sync invoice (add accommodation line)
     _sync_invoice(adm.id)
-
     return assignment
 
 
@@ -230,25 +236,13 @@ def transfer_bed(db: Session, admission_id: int, data: BedTransferRequest) -> Be
         raise HTTPException(400, "No active bed assignment to transfer from")
 
     new_bed = _assert_bed_free(db, data.new_bed_id)
-
     close_assignment(db, current, notes=f"Transferred to bed {new_bed.bed_number}")
-
-    assignment_number = code_service.next_assignment_number(db)
-    new_assignment = BedAssignment(
-        assignment_number=assignment_number,
-        admission_id=adm.id,
-        bed_id=new_bed.id,
-        is_active=True,
-        notes=data.notes or f"Transfer from bed {current.bed_id}",
+    new_assignment = _new_assignment(
+        db, adm, new_bed, data.notes or f"Transfer from bed {current.bed_id}"
     )
-    db.add(new_assignment)
-    new_bed.status = "occupied"
-
     db.commit()
     db.refresh(new_assignment)
-
     _sync_invoice(adm.id)
-
     return new_assignment
 
 
@@ -269,10 +263,7 @@ def discharge_admission(db: Session, admission_id: int, data: DischargeRequest) 
 
     db.commit()
     db.refresh(adm)
-
-    # Final invoice refresh (locks in the completed days)
     _sync_invoice(adm.id)
-
     return adm
 
 
