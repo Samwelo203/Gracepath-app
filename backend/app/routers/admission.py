@@ -13,7 +13,7 @@ from app.schemas.admission import (
     BedTransferRequest,
 )
 from app.services import admission_service as svc
-from app.core.security import require_staff, require_clinical
+from app.core.security import require_admin, require_staff, require_clinical
 from app.models.user import User
 from app.services import patient_service
 
@@ -27,11 +27,10 @@ def _get_admission_for_user(db: Session, admission_id: int, user: User):
     return admission
 
 
-# ---------- Admission CRUD ----------
 @router.post("", response_model=AdmissionRead, status_code=201)
 def create_admission(payload: AdmissionCreate, db: Session = Depends(get_db),
-                       user: User = Depends(require_staff)):
-    """Admit a patient. Auto-generates admission_number (ADM-YYYY-000001)."""
+                     user: User = Depends(require_staff)):
+    """Admit a patient. Auto-generates an admission number."""
     return svc.create_admission(db, payload)
 
 
@@ -45,19 +44,16 @@ def list_admissions(
     user: User = Depends(require_clinical),
 ):
     assigned_clinician_id = user.id if user.role == "clinician" else None
-    return svc.list_admissions(
-        db, status_filter, patient_id, skip, limit, assigned_clinician_id
-    )
+    return svc.list_admissions(db, status_filter, patient_id, skip, limit, assigned_clinician_id)
 
 
 @router.get("/{admission_id}", response_model=AdmissionWithPatient)
 def get_admission(admission_id: int, db: Session = Depends(get_db),
-                    user: User = Depends(require_clinical)):
-    adm = _get_admission_for_user(db, admission_id, user)
-    return svc.admission_with_patient(db, adm)
+                  user: User = Depends(require_clinical)):
+    admission = _get_admission_for_user(db, admission_id, user)
+    return svc.admission_with_patient(db, admission)
 
 
-# ---------- Bed assignment ----------
 @router.post("/{admission_id}/assign-bed", response_model=BedAssignmentRead, status_code=201)
 def assign_bed(
     admission_id: int,
@@ -66,43 +62,31 @@ def assign_bed(
     db: Session = Depends(get_db),
     user: User = Depends(require_staff),
 ):
-    """Assign a bed to an active admission. Marks bed as occupied."""
     payload = BedAssignmentCreate(admission_id=admission_id, bed_id=bed_id, notes=notes)
     return svc.assign_bed(db, payload)
 
 
 @router.post("/{admission_id}/transfer-bed", response_model=BedAssignmentRead, status_code=201)
-def transfer_bed(
-    admission_id: int,
-    payload: BedTransferRequest,
-    db: Session = Depends(get_db),
-    user: User = Depends(require_staff),
-):
-    """Move a patient to a different bed. Closes old assignment, opens new one."""
+def transfer_bed(admission_id: int, payload: BedTransferRequest,
+                 db: Session = Depends(get_db), user: User = Depends(require_staff)):
     return svc.transfer_bed(db, admission_id, payload)
 
 
 @router.get("/{admission_id}/current-bed", response_model=Optional[BedAssignmentRead])
 def current_bed(admission_id: int, db: Session = Depends(get_db),
-                  user: User = Depends(require_clinical)):
+                user: User = Depends(require_clinical)):
     _get_admission_for_user(db, admission_id, user)
     return svc.get_active_assignment(db, admission_id)
 
 
-# ---------- Discharge ----------
 @router.post("/{admission_id}/discharge", response_model=AdmissionRead)
-def discharge(
-    admission_id: int,
-    payload: DischargeRequest = DischargeRequest(),
-    db: Session = Depends(get_db),
-    user: User = Depends(require_staff),
-):
-    """Discharge patient. Closes active bed assignment, frees the bed."""
+def discharge(admission_id: int, payload: DischargeRequest = DischargeRequest(),
+              db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    """Discharge an admitted patient (admin only)."""
     return svc.discharge_admission(db, admission_id, payload)
 
 
-# ---------- Bed history ----------
 @router.get("/bed/{bed_id}/history", response_model=List[BedAssignmentRead])
 def bed_history(bed_id: int, db: Session = Depends(get_db),
-                 user: User = Depends(require_clinical)):
+                user: User = Depends(require_clinical)):
     return svc.bed_history(db, bed_id)
