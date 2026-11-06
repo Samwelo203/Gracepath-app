@@ -67,6 +67,20 @@ def _recalc_totals(inv: Invoice):
     inv.status = compute_status(inv.total_amount, inv.amount_paid)
 
 
+def refresh_active_admission_invoices(db: Session, admission_id: Optional[int] = None):
+    """Refresh live accommodation charges before returning invoice totals."""
+    from app.services.admission_billing_service import refresh_admission_accommodation
+
+    admissions_query = db.query(Admission).filter(Admission.status == "active")
+    if admission_id is not None:
+        admissions_query = admissions_query.filter(Admission.id == admission_id)
+
+    for admission in admissions_query.all():
+        invoice = get_by_admission(db, admission.id)
+        if invoice:
+            refresh_admission_accommodation(db, invoice.id)
+
+
 # ---------- Invoice creation ----------
 def create_for_admission(
     db: Session,
@@ -309,6 +323,7 @@ def list_invoices(
     db: Session, status_filter: Optional[str] = None,
     patient_id: Optional[int] = None, skip: int = 0, limit: int = 200,
 ):
+    refresh_active_admission_invoices(db)
     q = db.query(Invoice)
     if status_filter:
         q = q.filter(Invoice.status == status_filter)
@@ -318,6 +333,9 @@ def list_invoices(
 
 
 def invoice_detail(db: Session, inv: Invoice) -> dict:
+    if inv.admission_id is not None:
+        refresh_active_admission_invoices(db, inv.admission_id)
+        db.refresh(inv)
     patient = db.query(Patient).filter(Patient.id == inv.patient_id).first()
     adm = db.query(Admission).filter(Admission.id == inv.admission_id).first()
     return {
@@ -343,6 +361,9 @@ def invoice_detail(db: Session, inv: Invoice) -> dict:
 
 def public_view(db: Session, invoice_number: str) -> dict:
     inv = get_invoice_by_number(db, invoice_number)
+    if inv.admission_id is not None:
+        refresh_active_admission_invoices(db, inv.admission_id)
+        db.refresh(inv)
     patient = db.query(Patient).filter(Patient.id == inv.patient_id).first()
     return {
         "invoice_number": inv.invoice_number,
@@ -371,6 +392,11 @@ def apply_payment(db: Session, invoice_id: int, amount: Decimal) -> Invoice:
 # ---------- Stats ----------
 def stats(db: Session) -> dict:
     from sqlalchemy import func
+
+    # Keep dashboard totals current for active stays rather than waiting for
+    # another admission/bed event or for the patient to be discharged.
+    refresh_active_admission_invoices(db)
+
     rows = db.query(Invoice.status, func.count(Invoice.id)).group_by(Invoice.status).all()
     counts = {s: c for s, c in rows}
 
