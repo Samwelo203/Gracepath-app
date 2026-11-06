@@ -9,8 +9,7 @@ from app.schemas.patient import (
 )
 from app.services import patient_service
 from app.core.security import (
-    require_admin, require_patient_access, require_patient_options, require_clinician,
-    require_staff,
+    require_admin, require_patient_access, require_patient_options, require_clinician, require_staff,
 )
 from app.models.user import User
 
@@ -19,7 +18,7 @@ router = APIRouter(prefix="/api/patients", tags=["Patients"])
 
 @router.post("", response_model=PatientRead, status_code=201)
 def register_patient(payload: PatientCreate, db: Session = Depends(get_db),
-                     user: User = Depends(require_staff)):
+                   user: User = Depends(require_staff)):
     """Register a new patient. Auto-generates patient_number (GPC-000001)."""
     return patient_service.create_patient(db, payload)
 
@@ -50,13 +49,13 @@ def patient_options(
 
 @router.get("/{patient_id}", response_model=PatientRead)
 def get_patient(patient_id: int, db: Session = Depends(get_db),
-                 user: User = Depends(require_patient_access)):
+               user: User = Depends(require_patient_access)):
     return patient_service.get_patient_for_user(db, patient_id, user)
 
 
 @router.get("/number/{patient_number}", response_model=PatientRead)
 def get_patient_by_number(patient_number: str, db: Session = Depends(get_db),
-                            user: User = Depends(require_patient_access)):
+                        user: User = Depends(require_patient_access)):
     return patient_service.get_patient_by_number(db, patient_number, user)
 
 
@@ -80,14 +79,14 @@ def assign_patient(
 
 @router.delete("/{patient_id}", status_code=204)
 def delete_patient(patient_id: int, db: Session = Depends(get_db),
-                    user: User = Depends(require_admin)):
+                 user: User = Depends(require_admin)):
     patient_service.delete_patient(db, patient_id)
     return None
 
 
 @router.get("/{patient_id}/notes", response_model=List[PatientNoteRead])
 def list_patient_notes(patient_id: int, db: Session = Depends(get_db),
-                       user: User = Depends(require_patient_access)):
+                    user: User = Depends(require_patient_access)):
     notes = patient_service.list_notes(db, patient_id, user)
     return [
         {
@@ -106,8 +105,8 @@ def list_patient_notes(patient_id: int, db: Session = Depends(get_db),
 
 @router.post("/{patient_id}/notes", response_model=PatientNoteRead, status_code=201)
 def add_patient_note(patient_id: int, payload: PatientNoteCreate,
-                     db: Session = Depends(get_db),
-                     user: User = Depends(require_clinician)):
+                    db: Session = Depends(get_db),
+                    user: User = Depends(require_clinician)):
     note = patient_service.add_note(db, patient_id, payload, user)
     return {
         "id": note.id,
