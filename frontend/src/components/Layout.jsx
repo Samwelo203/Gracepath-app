@@ -5,17 +5,16 @@ import { ROLES } from '../lib/auth';
 import { Button, Icon, Modal } from './ui';
 
 const NAV = [
-  { to: '/',           label: 'Dashboard',  icon: 'dashboard', roles: null },
-  { to: '/patients',   label: 'Patients',   icon: 'patients', roles: [ROLES.ADMIN, ROLES.CLINICIAN] },
-  { to: '/beds',       label: 'Beds',       icon: 'bed', roles: null },
+  { to: '/', label: 'Dashboard', icon: 'dashboard', roles: null },
+  { to: '/patients', label: 'Patients', icon: 'patients', roles: [ROLES.ADMIN, ROLES.CLINICIAN, ROLES.RECEPTIONIST] },
+  { to: '/beds', label: 'Beds', icon: 'bed', roles: null },
   { to: '/admissions', label: 'Admissions', icon: 'stethoscope', roles: null },
-  { to: '/invoices',   label: 'Invoices',   icon: 'invoice', roles: [ROLES.ADMIN, ROLES.ACCOUNTS] },
-  { to: '/payments',   label: 'Payments',   icon: 'payment', roles: [ROLES.ADMIN, ROLES.ACCOUNTS] },
-  { to: '/reports',    label: 'Reports',    icon: 'report',  roles: [ROLES.ADMIN] },
-  { to: '/users',      label: 'Users',      icon: 'security', roles: [ROLES.ADMIN] },
+  { to: '/invoices', label: 'Invoices', icon: 'invoice', roles: [ROLES.ADMIN, ROLES.ACCOUNTS] },
+  { to: '/payments', label: 'Payments', icon: 'payment', roles: [ROLES.ADMIN, ROLES.ACCOUNTS] },
+  { to: '/reports', label: 'Reports', icon: 'report', roles: [ROLES.ADMIN] },
+  { to: '/users', label: 'Users', icon: 'security', roles: [ROLES.ADMIN] },
 ];
 
-// External links open in a new tab
 const EXTERNAL_NAV = [
   { href: '/pay/payment.html', label: 'Payer Portal', icon: 'wallet', roles: [ROLES.ADMIN, ROLES.ACCOUNTS, ROLES.RECEPTIONIST], hint: 'opens in new tab' },
 ];
@@ -30,8 +29,8 @@ export default function Layout() {
     navigate('/login', { replace: true });
   }
 
-  const visibleNav = NAV.filter(item => !item.roles || item.roles.includes(user?.role));
-  const visibleExternalNav = EXTERNAL_NAV.filter(item => !item.roles || item.roles.includes(user?.role));
+  const visibleNav = NAV.filter((item) => !item.roles || item.roles.includes(user?.role));
+  const visibleExternalNav = EXTERNAL_NAV.filter((item) => !item.roles || item.roles.includes(user?.role));
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -61,13 +60,7 @@ export default function Layout() {
               key={item.to}
               to={item.to}
               end={item.to === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                  isActive
-                    ? 'bg-brand-500 text-white'
-                    : 'text-brand-100 hover:bg-brand-700'
-                }`
-              }
+              className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive ? 'bg-brand-500 text-white' : 'text-brand-100 hover:bg-brand-700'}`}
               title={collapsed ? item.label : undefined}
             >
               <Icon name={item.icon} size={18} />
@@ -168,24 +161,12 @@ function InstallAppButton({ collapsed }) {
         <Icon name="download" size={18} />
         {!collapsed && <span>Install App</span>}
       </button>
-      <Modal
-        open={showInstructions}
-        onClose={() => setShowInstructions(false)}
-        title="Install Grace Path"
-      >
+      <Modal open={showInstructions} onClose={() => setShowInstructions(false)} title="Install Grace Path">
         <div className="space-y-4 text-sm text-gray-700">
           <p>Install this staff app on your device for a dedicated app window and faster access.</p>
-          <div>
-            <h3 className="font-semibold text-gray-900">Chrome or Edge</h3>
-            <p>Open the browser menu and choose “Install Grace Path” or “Install page as app”.</p>
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">iPhone or iPad</h3>
-            <p>Tap Share in Safari, then choose “Add to Home Screen”.</p>
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={() => setShowInstructions(false)}>Done</Button>
-          </div>
+          <div><h3 className="font-semibold text-gray-900">Chrome or Edge</h3><p>Open the browser menu and choose “Install Grace Path” or “Install page as app”.</p></div>
+          <div><h3 className="font-semibold text-gray-900">iPhone or iPad</h3><p>Tap Share in Safari, then choose “Add to Home Screen”.</p></div>
+          <div className="flex justify-end"><Button onClick={() => setShowInstructions(false)}>Done</Button></div>
         </div>
       </Modal>
     </>
