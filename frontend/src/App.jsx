@@ -1,12 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Patients from './pages/Patients';
+import ReceptionistPatients from './pages/ReceptionistPatients';
 import Beds from './pages/Beds';
 import Admissions from './pages/Admissions';
 import Invoices from './pages/Invoices';
@@ -24,15 +25,9 @@ const queryClient = new QueryClient({
   },
 });
 
-function Placeholder({ title }) {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold mb-4">{title}</h1>
-      <div className="bg-white rounded-xl shadow p-8 text-center text-gray-500">
-        <p className="text-sm">Coming soon.</p>
-      </div>
-    </div>
-  );
+function PatientDirectory() {
+  const { user } = useAuth();
+  return user?.role === 'receptionist' ? <ReceptionistPatients /> : <Patients />;
 }
 
 export default function App() {
@@ -55,7 +50,7 @@ export default function App() {
                 path="patients"
                 element={
                   <ProtectedRoute roles={['admin', 'clinician', 'receptionist']}>
-                    <Patients />
+                    <PatientDirectory />
                   </ProtectedRoute>
                 }
               />
