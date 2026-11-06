@@ -10,6 +10,7 @@ from app.schemas.patient import (
 from app.services import patient_service
 from app.core.security import (
     require_admin, require_patient_access, require_patient_options, require_clinician,
+    require_staff,
 )
 from app.models.user import User
 
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/api/patients", tags=["Patients"])
 
 @router.post("", response_model=PatientRead, status_code=201)
 def register_patient(payload: PatientCreate, db: Session = Depends(get_db),
-                     user: User = Depends(require_admin)):
+                     user: User = Depends(require_staff)):
     """Register a new patient. Auto-generates patient_number (GPC-000001)."""
     return patient_service.create_patient(db, payload)
 

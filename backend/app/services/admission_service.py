@@ -21,9 +21,10 @@ def _now():
 
 
 def _sync_invoice(admission_id: int):
-    """Called after bed changes. Ensures invoice exists and reflects current bed."""
+    """Ensure the admission invoice reflects all daily bed charges."""
     from app.db.session import SessionLocal
     from app.services import billing_service
+    from app.services.admission_billing_service import refresh_admission_accommodation
     db = SessionLocal()
     try:
         adm = db.query(Admission).filter(Admission.id == admission_id).first()
@@ -31,9 +32,8 @@ def _sync_invoice(admission_id: int):
             return
         inv = billing_service.get_by_admission(db, admission_id)
         if not inv:
-            billing_service.create_for_admission(db, admission_id)
-        else:
-            billing_service.refresh_accommodation(db, inv.id)
+            inv = billing_service.create_for_admission(db, admission_id)
+        refresh_admission_accommodation(db, inv.id)
     except Exception as e:
         print(f"[WARN] _sync_invoice({admission_id}) failed: {e}")
     finally:
@@ -85,9 +85,15 @@ def create_admission(db: Session, data: AdmissionCreate) -> Admission:
         raise HTTPException(404, f"Patient {data.patient_id} not found")
 
     admission_number = code_service.next_admission_number(db)
+    admitted_at = (
+        datetime.combine(data.admission_date, datetime.min.time(), tzinfo=timezone.utc)
+        if data.admission_date
+        else _now()
+    )
     adm = Admission(
         admission_number=admission_number,
         patient_id=patient.id,
+        admitted_at=admitted_at,
         reason=data.reason,
         notes=data.notes,
         status="active",
@@ -166,6 +172,7 @@ def assign_bed(db: Session, data: BedAssignmentCreate) -> BedAssignment:
         assignment_number=assignment_number,
         admission_id=adm.id,
         bed_id=bed.id,
+        started_at=adm.admitted_at,
         is_active=True,
         notes=data.notes,
     )

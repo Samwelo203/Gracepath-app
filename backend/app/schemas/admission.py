@@ -1,13 +1,21 @@
-from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from datetime import date, datetime, timezone
 from typing import Optional
 
 
 # ---------- Admission ----------
 class AdmissionCreate(BaseModel):
     patient_id: int
+    admission_date: Optional[date] = None
     reason: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator("admission_date")
+    @classmethod
+    def admission_date_must_not_be_future(cls, value: Optional[date]) -> Optional[date]:
+        if value is not None and value > datetime.now(timezone.utc).date():
+            raise ValueError("Admission date must be today or earlier")
+        return value
 
 
 class AdmissionRead(BaseModel):
