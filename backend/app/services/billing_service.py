@@ -63,7 +63,7 @@ def _recalc_totals(inv: Invoice):
     subtotal = sum((item.amount for item in inv.items), Decimal("0"))
     inv.subtotal = subtotal
     inv.total_amount = subtotal
-    inv.balance = inv.total_amount - inv.amount_paid
+    inv.balance = max(inv.total_amount - inv.amount_paid, Decimal("0"))
     inv.status = compute_status(inv.total_amount, inv.amount_paid)
 
 
@@ -97,9 +97,8 @@ def create_for_admission(
         return existing
 
     invoice_number = code_service.next_invoice_number(db)
-    # Generate a unique 5-character account reference
     from app.utils.code_generator import generate_account_reference
-    for _ in range(10):  # retry on collision (extremely unlikely)
+    for _ in range(10):
         account_ref = generate_account_reference()
         if not db.query(Invoice).filter(Invoice.account_reference == account_ref).first():
             break
@@ -119,7 +118,6 @@ def create_for_admission(
     db.add(inv)
     db.flush()
 
-    # If a bed is already assigned, add accommodation
     active = (
         db.query(BedAssignment)
         .filter(
@@ -255,7 +253,6 @@ def refresh_accommodation(db: Session, invoice_id: int, billing_policy: str = "2
     if not bed:
         return inv
 
-    # Remove old accommodation line(s)
     for item in list(inv.items):
         if item.description.startswith("Accommodation –"):
             db.delete(item)
@@ -318,7 +315,6 @@ def delete_item(db: Session, invoice_id: int, item_id: int) -> Invoice:
     return inv
 
 
-# ---------- Listing / detail ----------
 def list_invoices(
     db: Session, status_filter: Optional[str] = None,
     patient_id: Optional[int] = None, skip: int = 0, limit: int = 200,
@@ -381,8 +377,12 @@ def public_view(db: Session, invoice_number: str) -> dict:
 # ---------- Payment application (called by payment module) ----------
 def apply_payment(db: Session, invoice_id: int, amount: Decimal) -> Invoice:
     inv = get_invoice(db, invoice_id)
-    inv.amount_paid = inv.amount_paid + Decimal(amount)
-    inv.balance = inv.total_amount - inv.amount_paid
+    payment = Decimal(amount)
+    if payment <= 0:
+        raise HTTPException(400, "Payment must be greater than zero")
+
+    inv.amount_paid = inv.amount_paid + payment
+    inv.balance = max(inv.total_amount - inv.amount_paid, Decimal("0"))
     inv.status = compute_status(inv.total_amount, inv.amount_paid)
     db.add(inv)
     db.flush()
@@ -393,8 +393,6 @@ def apply_payment(db: Session, invoice_id: int, amount: Decimal) -> Invoice:
 def stats(db: Session) -> dict:
     from sqlalchemy import func
 
-    # Keep dashboard totals current for active stays rather than waiting for
-    # another admission/bed event or for the patient to be discharged.
     refresh_active_admission_invoices(db)
 
     rows = db.query(Invoice.status, func.count(Invoice.id)).group_by(Invoice.status).all()
